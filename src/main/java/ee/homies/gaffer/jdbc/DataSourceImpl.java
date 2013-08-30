@@ -53,7 +53,7 @@ public class DataSourceImpl extends DataSourceWrapper {
   private Connection getTransactionalConnection(String username, String password) throws SQLException {
     TransactionSynchronizationRegistry registry = ServiceRegistry.getInstance().getTransactionSynchronizationRegistry();
     if (registry.getTransactionStatus() == Status.STATUS_NO_TRANSACTION) {
-      log.warn("Connection requested outside of transaction.");
+      log.debug("Connection requested outside of transaction.");
       Connection con = getConnectionFromDataSource(username, password);
       if (!con.getAutoCommit()) {
         con.setAutoCommit(true);
