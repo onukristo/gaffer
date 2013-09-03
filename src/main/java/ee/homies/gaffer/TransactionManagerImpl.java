@@ -56,8 +56,9 @@ public class TransactionManagerImpl implements TransactionManager {
       throw new IllegalStateException("Can not resume. Current thread is already associated with transaction.");
     }
     if (!(transaction instanceof TransactionImpl)) {
-      transactions.set((TransactionImpl) transaction);
+      throw new IllegalStateException("Unsupported transaction implementation provided.");
     }
+    transactions.set((TransactionImpl) transaction);
   }
 
   @Override
