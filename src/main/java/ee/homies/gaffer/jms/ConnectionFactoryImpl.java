@@ -56,16 +56,12 @@ public class ConnectionFactoryImpl implements ConnectionFactory {
 
     @Override
     public void close() throws JMSException {
-      log.info("Closing connection.");
-      // connection.close();
     }
 
     @Override
     public Session createSession(boolean transacted, int acknowledgeMode) throws JMSException {
-      log.info("Create session called.");
       TransactionSynchronizationRegistry registry = ServiceRegistry.getInstance().getTransactionSynchronizationRegistry();
       if (registry.getTransactionStatus() == Status.STATUS_NO_TRANSACTION) {
-        log.info("No transaction detected. Returning normal session.");
         Session session = getConnection().createSession(transacted, acknowledgeMode);
         return session;
       }
@@ -91,14 +87,11 @@ public class ConnectionFactoryImpl implements ConnectionFactory {
 
     @Override
     public void commit() throws JMSException {
-      log.info("Commiting session. ");
       super.commit();
     }
 
     @Override
     public void close() throws JMSException {
-      log.info("Closing session.");
-      // super.close();
     }
 
     public void closeSession() throws JMSException {

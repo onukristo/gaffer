@@ -9,7 +9,7 @@ public class TransactionSynchronizationRegistryImpl implements TransactionSynchr
   @Override
   public Object getTransactionKey() {
     TransactionImpl transaction = ServiceRegistry.getInstance().getTransactionManager().getTransactionImpl();
-    return transaction == null ? null : transaction.getId();
+    return transaction == null ? null : transaction.getGlobalTransactionId();
   }
 
   @Override

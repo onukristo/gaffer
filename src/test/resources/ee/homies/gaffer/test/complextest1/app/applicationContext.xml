@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:context="http://www.springframework.org/schema/context"
+  xmlns:tx="http://www.springframework.org/schema/tx" xmlns:amq="http://activemq.apache.org/schema/core"
+  xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+           http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd
+           http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx.xsd
+           http://activemq.apache.org/schema/core http://activemq.apache.org/schema/core/activemq-core.xsd">
+
+  <context:annotation-config />
+  <context:component-scan base-package="ee.homies.gaffer.test.complextest1.app" />
+  
+  <tx:annotation-driven transaction-manager="transactionManager" />
+
+  <context:property-placeholder />
+
+  <bean id="gafferServiceRegistry" class="ee.homies.gaffer.ServiceRegistry" factory-method="createInstance" destroy-method="destroyInstance">
+  </bean>
+
+  <bean id="gafferTransactionManager" factory-bean="gafferServiceRegistry" factory-method="getTransactionManager">
+  </bean>
+
+  <bean id="gafferUserTransaction" factory-bean="gafferServiceRegistry" factory-method="getUserTransaction">
+  </bean>
+
+  <bean id="transactionManager" class="org.springframework.transaction.jta.JtaTransactionManager">
+    <property name="transactionManager" ref="gafferTransactionManager" />
+    <property name="userTransaction" ref="gafferUserTransaction" />
+  </bean>
+
+  <bean id="baseDataSource" abstract="true" class="org.apache.tomcat.jdbc.pool.DataSource" lazy-init="true" destroy-method="close">
+    <property name="maxActive" value="${maxPoolSize}" />
+    <property name="maxIdle" value="${maxPoolSize}" />
+    <property name="minIdle" value="0" />
+    <property name="maxWait" value="10000" />
+    <property name="maxAge" value="3600000" />
+    <property name="initialSize" value="0" />
+    <property name="logAbandoned" value="true" />
+    <property name="suspectTimeout" value="10" />
+    <property name="logValidationErrors" value="true" />
+    <property name="fairQueue" value="true" />
+    <property name="timeBetweenEvictionRunsMillis" value="10000" />
+    <property name="minEvictableIdleTimeMillis" value="10000" />
+    <property name="removeAbandoned" value="true" />
+    <property name="removeAbandonedTimeout" value="600000" />
+    <property name="abandonWhenPercentageFull" value="75" />
+    <property name="jmxEnabled" value="true" />
+    <property name="validationInterval" value="5000" />
+    <property name="testWhileIdle" value="true" />
+    <property name="testOnBorrow" value="true" />
+    <property name="testOnReturn" value="true" />
+    <property name="validationQuery" value="SELECT 1 FROM DUAL" />
+    <property name="defaultTransactionIsolation" value="2" />
+    <property name="jdbcInterceptors" value="ConnectionState;StatementFinalizer;SlowQueryReport(threshold=5000,maxQueries=5000);ResetAbandonedTimer" />
+    <property name="driverClassName" value="org.hsqldb.jdbcDriver" />
+  </bean>
+  <bean id="clientsDataSource" class="ee.homies.gaffer.jdbc.DataSourceImpl" init-method="init">
+    <property name="dataSource">
+      <bean parent="baseDataSource">
+        <property name="url" value="jdbc:hsqldb:mem:clients" />
+        <property name="username" value="SA" />
+        <property name="password" value="" />
+      </bean>
+    </property>
+  </bean>
+  <bean id="usersDataSource" class="ee.homies.gaffer.jdbc.DataSourceImpl" init-method="init">
+    <property name="dataSource">
+      <bean parent="baseDataSource">
+        <property name="url" value="jdbc:hsqldb:mem:users" />
+        <property name="username" value="SA" />
+        <property name="password" value="" />
+      </bean>
+    </property>
+  </bean>
+  <bean id="secretsDataSource" class="ee.homies.gaffer.jdbc.DataSourceImpl" init-method="init">
+    <property name="dataSource">
+      <bean id="secretsInnerDatasource" parent="baseDataSource">
+        <property name="url" value="${database.secrets.url}" />
+        <property name="username" value="SA" />
+        <property name="password" value="" />
+      </bean>
+    </property>
+  </bean>
+  <bean id="accountsDataSource" class="ee.homies.gaffer.jdbc.DataSourceImpl" init-method="init">
+    <property name="dataSource">
+      <bean parent="baseDataSource">
+        <property name="url" value="jdbc:hsqldb:mem:accounts" />
+        <property name="username" value="SA" />
+        <property name="password" value="" />
+      </bean>
+    </property>
+  </bean>
+  <bean id="clientsAdminDataSource" class="ee.homies.gaffer.jdbc.DataSourceImpl" init-method="init">
+    <property name="dataSource">
+      <bean parent="baseDataSource">
+        <property name="url" value="jdbc:hsqldb:mem:clients" />
+        <property name="username" value="SA" />
+        <property name="password" value="" />
+      </bean>
+    </property>
+  </bean>
+  <bean id="usersAdminDataSource" class="ee.homies.gaffer.jdbc.DataSourceImpl" init-method="init">
+    <property name="dataSource">
+      <bean parent="baseDataSource">
+        <property name="url" value="jdbc:hsqldb:mem:users" />
+        <property name="username" value="SA" />
+        <property name="password" value="" />
+      </bean>
+    </property>
+  </bean>
+  <bean id="secretsAdminDataSource" class="ee.homies.gaffer.jdbc.DataSourceImpl" init-method="init">
+    <property name="dataSource">
+      <bean id="secretsInnerDatasource" parent="baseDataSource">
+        <property name="url" value="jdbc:hsqldb:mem:secrets" />
+        <property name="username" value="SA" />
+        <property name="password" value="" />
+      </bean>
+    </property>
+  </bean>
+  <bean id="accountsAdminDataSource" class="ee.homies.gaffer.jdbc.DataSourceImpl" init-method="init">
+    <property name="dataSource">
+      <bean parent="baseDataSource">
+        <property name="url" value="jdbc:hsqldb:mem:accounts" />
+        <property name="username" value="SA" />
+        <property name="password" value="" />
+      </bean>
+    </property>
+  </bean>
+  <bean id="clientsSessionFactory" class="org.springframework.orm.hibernate4.LocalSessionFactoryBean">
+    <property name="dataSource" ref="clientsDataSource" />
+    <property name="jtaTransactionManager" ref="transactionManager" />
+    <property name="packagesToScan">
+      <list>
+        <value>ee.homies.gaffer.test.complextest1.app</value>
+      </list>
+    </property>
+    <property name="hibernateProperties">
+      <value>
+        hibernate.dialect=org.hibernate.dialect.HSQLDialect
+      </value>
+    </property>
+  </bean>
+</beans>

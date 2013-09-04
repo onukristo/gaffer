@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:context="http://www.springframework.org/schema/context"
+  xmlns:tx="http://www.springframework.org/schema/tx" xmlns:amq="http://activemq.apache.org/schema/core"
+  xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+           http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd
+           http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx.xsd
+           http://activemq.apache.org/schema/core http://activemq.apache.org/schema/core/activemq-core.xsd">
+
+  <context:component-scan base-package="ee.homies.gaffer.test.complextest1.jms" />           
+           
+  <amq:broker id="messagingBroker">
+    <amq:transportConnectors>
+      <amq:transportConnector uri="tcp://localhost:0" />
+    </amq:transportConnectors>
+  </amq:broker>
+  <bean id="jmsFactory" class="ee.homies.gaffer.jms.ConnectionFactoryImpl" init-method="init">
+    <property name="connectionFactory">
+      <bean class="org.apache.activemq.ActiveMQConnectionFactory">
+        <property name="brokerURL">
+          <value>vm://localhost</value>
+        </property>
+      </bean>
+    </property>
+  </bean>
+  <bean id="clientNotificationsQueue" class="org.apache.activemq.command.ActiveMQQueue">
+    <constructor-arg value="clientNotificationsQueue" />
+  </bean>
+  <bean id="messageListener" class="org.springframework.jms.listener.adapter.MessageListenerAdapter">
+    <constructor-arg>
+      <bean class="ee.homies.gaffer.test.complextest1.jms.JMSNotificationListener" />
+    </constructor-arg>
+  </bean>
+  <bean id="jmsContainer" class="org.springframework.jms.listener.DefaultMessageListenerContainer">
+    <property name="connectionFactory" ref="jmsFactory" />
+    <property name="destination" ref="clientNotificationsQueue" />
+    <property name="messageListener" ref="messageListener" />
+    <property name="transactionManager" ref="transactionManager" />
+  </bean>
+</beans>

@@ -16,7 +16,9 @@ public class TransactionManagerImpl implements TransactionManager {
       throw new NotSupportedException("Nested transactions are not supported.");
     }
 
-    transactions.set(new TransactionImpl());
+    TransactionImpl transactionImpl = new TransactionImpl();
+    transactionImpl.begin();
+    transactions.set(transactionImpl);
   }
 
   @Override
@@ -56,8 +58,9 @@ public class TransactionManagerImpl implements TransactionManager {
       throw new IllegalStateException("Can not resume. Current thread is already associated with transaction.");
     }
     if (!(transaction instanceof TransactionImpl)) {
-      transactions.set((TransactionImpl) transaction);
+      throw new IllegalStateException("Can not resume. Unsupported transaction object '" + transaction + "' provided.");
     }
+    transactions.set((TransactionImpl) transaction);
   }
 
   @Override
@@ -90,7 +93,6 @@ public class TransactionManagerImpl implements TransactionManager {
 
   @Override
   public Transaction suspend() throws SystemException {
-    log.debug("Suspending transaction.");
     Transaction transaction = getTransaction();
     if (transaction != null) {
       transactions.remove();
