@@ -6,7 +6,7 @@ import ee.homies.gaffer.util.Clock;
 import ee.homies.gaffer.util.MonotonicClock;
 
 public class ServiceRegistry {
-  private static ServiceRegistry serviceRegistry;
+  private static volatile ServiceRegistry instance;
   private final TransactionManagerImpl transactionManager;
   private final TransactionSynchronizationRegistry transactionSynchronizationRegistry;
   private final UserTransactionImpl userTransaction;
@@ -14,10 +14,10 @@ public class ServiceRegistry {
   private final Clock clock;
 
   public static ServiceRegistry getInstance() {
-    if (serviceRegistry == null) {
+    if (instance == null) {
       throw new IllegalStateException("ServiceRegistry is not initialized.");
     }
-    return serviceRegistry;
+    return instance;
   }
 
   public static ServiceRegistry createInstance() {
@@ -26,19 +26,19 @@ public class ServiceRegistry {
 
   public static ServiceRegistry createInstance(Configuration configuration) {
     synchronized (ServiceRegistry.class) {
-      if (serviceRegistry != null) {
+      if (instance != null) {
         throw new IllegalStateException("Service registry already created.");
       }
     }
     ServiceRegistry registry = new ServiceRegistry(configuration);
-    serviceRegistry = registry;
+    instance = registry;
 
-    return serviceRegistry;
+    return instance;
   }
 
   public static void destroyInstance() {
     getInstance().destroy();
-    serviceRegistry = null;
+    instance = null;
   }
 
   private ServiceRegistry(Configuration configuration) {

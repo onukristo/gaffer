@@ -11,15 +11,28 @@ import org.springframework.transaction.UnexpectedRollbackException;
 
 import ee.homies.gaffer.test.suspended.app.ClientsService;
 import ee.homies.gaffer.test.suspended.app.DatabasesManager;
+import ee.homies.gaffer.util.FormatLogger;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/ee/homies/gaffer/test/suspended/applicationContext.xml" })
 public class SuspendedTest {
+  private static final FormatLogger log = new FormatLogger(SuspendedTest.class);
   @Resource(name = "clientsService")
   private ClientsService clientsService;
 
   @Resource(name = "databasesManager")
   private DatabasesManager databasesManager;
+
+  @Test
+  public void testSuccess2() {
+    clientsService.createClient2("Aadu");
+    try {
+      Thread.sleep(20000);
+    } catch (InterruptedException e) {
+      log.error(e.getMessage(), e);
+    }
+    Assert.assertEquals(1, databasesManager.getTableRowsCount("clients.clients"));
+  }
 
   @Test
   public void testSuccess() {

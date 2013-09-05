@@ -26,8 +26,8 @@
   </bean>
 
   <bean id="baseDataSource" abstract="true" class="org.apache.tomcat.jdbc.pool.DataSource" lazy-init="true" destroy-method="close">
-    <property name="maxActive" value="1" />
-    <property name="maxIdle" value="1" />
+    <property name="maxActive" value="2" />
+    <property name="maxIdle" value="2" />
     <property name="minIdle" value="0" />
     <property name="maxWait" value="10000" />
     <property name="maxAge" value="3600000" />

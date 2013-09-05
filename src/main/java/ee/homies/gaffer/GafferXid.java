@@ -7,8 +7,13 @@ import ee.homies.gaffer.util.Uid;
 public class GafferXid implements Xid {
   private static final int FORMAT_ID = 0x47666672;
 
-  private Uid globalTransactionId;
-  private Uid branchQualifier;
+  private final Uid globalTransactionId;
+  private final Uid branchQualifier;
+
+  public GafferXid(Uid globalTransactionId, Uid branchQualifier) {
+    this.globalTransactionId = globalTransactionId;
+    this.branchQualifier = branchQualifier;
+  }
 
   @Override
   public int getFormatId() {

@@ -11,6 +11,7 @@ public class TransactionManagerImpl implements TransactionManager {
 
   @Override
   public void begin() throws NotSupportedException, SystemException {
+    System.out.println("begin");
     Transaction transaction = getTransaction();
     if (transaction != null) {
       throw new NotSupportedException("Nested transactions are not supported.");

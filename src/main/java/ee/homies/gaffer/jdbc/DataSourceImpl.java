@@ -75,10 +75,15 @@ public class DataSourceImpl extends DataSourceWrapper {
   }
 
   private Connection getConnectionFromDataSource(String username, String password) throws SQLException {
-    if (username == null) {
-      return getDataSource().getConnection();
+    try {
+      if (username == null) {
+        return getDataSource().getConnection();
+      }
+      return getDataSource().getConnection(username, password);
+    } catch (SQLException e) {
+      e.printStackTrace();
+      throw e;
     }
-    return getDataSource().getConnection(username, password);
   }
 
   public static class ConnectionImpl extends ConnectionWrapper {
