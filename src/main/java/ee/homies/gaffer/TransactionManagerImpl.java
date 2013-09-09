@@ -8,17 +8,17 @@ public class TransactionManagerImpl implements TransactionManager {
   private final static FormatLogger log = new FormatLogger(TransactionManagerImpl.class);
 
   private final ThreadLocal<TransactionImpl> transactions = new ThreadLocal<>();
+  private final ThreadLocal<Integer> transactionTimeoutsSeconds = new ThreadLocal<>();
 
   @Override
   public void begin() throws NotSupportedException, SystemException {
-    System.out.println("begin");
     Transaction transaction = getTransaction();
     if (transaction != null) {
       throw new NotSupportedException("Nested transactions are not supported.");
     }
 
     TransactionImpl transactionImpl = new TransactionImpl();
-    transactionImpl.begin();
+    transactionImpl.begin(transactionTimeoutsSeconds.get());
     transactions.set(transactionImpl);
   }
 
@@ -61,7 +61,11 @@ public class TransactionManagerImpl implements TransactionManager {
     if (!(transaction instanceof TransactionImpl)) {
       throw new IllegalStateException("Can not resume. Unsupported transaction object '" + transaction + "' provided.");
     }
-    transactions.set((TransactionImpl) transaction);
+    TransactionImpl transactionImpl = (TransactionImpl) transaction;
+    if (log.isDebugEnabled()) {
+      log.debug("Resuming transaction '%s'.", transactionImpl.getTransactionInfo());
+    }
+    transactions.set(transactionImpl);
   }
 
   @Override
@@ -89,14 +93,20 @@ public class TransactionManagerImpl implements TransactionManager {
 
   @Override
   public void setTransactionTimeout(int seconds) throws SystemException {
-    // TODO need to implement.
+    transactionTimeoutsSeconds.set(seconds);
   }
 
   @Override
   public Transaction suspend() throws SystemException {
-    Transaction transaction = getTransaction();
+    TransactionImpl transaction = getTransactionImpl();
+
     if (transaction != null) {
+      if (log.isDebugEnabled()) {
+        log.debug("Suspending transaction '" + transaction.getTransactionInfo() + "'.");
+      }
       transactions.remove();
+    } else {
+      log.debug("Suspend called for non-existent transaction.");
     }
     return transaction;
   }

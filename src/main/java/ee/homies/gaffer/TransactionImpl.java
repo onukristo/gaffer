@@ -49,9 +49,12 @@ public class TransactionImpl implements Transaction {
     return resources.get(key);
   }
 
-  public void begin() {
+  public void begin(Integer timeoutSeconds) {
     if (log.isDebugEnabled()) {
-      log.debug("Starting transaction '%s'.", getTransactionInfo());
+      log.debug("Starting transaction '%s' with timeout of '%s' seconds.", getTransactionInfo(), timeoutSeconds == null ? "infinite" : timeoutSeconds);
+    }
+    if (timeoutSeconds != null) {
+      setTimeoutMillis(timeoutSeconds * 1000);
     }
     status = Status.STATUS_ACTIVE;
   }
@@ -104,9 +107,8 @@ public class TransactionImpl implements Transaction {
         rollback();
         if (idx == 0) {
           throw new RollbackExceptionImpl("Can not commit '" + getTransactionInfo() + "'. Commiting a resource failed.", ex);
-        } else {
-          throw new HeuristicMixedExceptionImpl("Can not commit '" + getTransactionInfo() + "'. Commiting a resource failed.", ex);
         }
+        throw new HeuristicMixedExceptionImpl("Can not commit '" + getTransactionInfo() + "'. Commiting a resource failed.", ex);
       }
       setStatus(Status.STATUS_COMMITTED);
       if (log.isDebugEnabled()) {
@@ -279,7 +281,7 @@ public class TransactionImpl implements Transaction {
     }
   }
 
-  private String getTransactionInfo() {
+  public String getTransactionInfo() {
     return globalTransactionId + "/" + TransactionStatuses.toString(getStatus());
   }
 

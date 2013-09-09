@@ -14,6 +14,11 @@ public class LogsService {
   @Resource(name = "idGenerator")
   private IdGenerator idGenerator;
 
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  public void appendLogNotSupported(String message) {
+    logsDAO.createLogMessage(idGenerator.next(), message);
+  }
+
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void appendError(String message) {
     logsDAO.createLogMessage(idGenerator.next(), message);

@@ -1,8 +1,10 @@
 package ee.homies.gaffer.test.suspended;
 
 import javax.annotation.Resource;
+import javax.sql.DataSource;
 
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.test.context.ContextConfiguration;
@@ -23,15 +25,26 @@ public class SuspendedTest {
   @Resource(name = "databasesManager")
   private DatabasesManager databasesManager;
 
+  @Resource(name = "clientsInnerDataSource")
+  private DataSource clientsInnerDataSource;
+
+  @Resource(name = "logsInnerDataSource")
+  private DataSource logsInnerDataSource;
+
+  @Before
+  public void afterTest() {
+    databasesManager.deleteRows();
+  }
+
   @Test
   public void testSuccess2() {
-    clientsService.createClient2("Aadu");
-    try {
-      Thread.sleep(20000);
-    } catch (InterruptedException e) {
-      log.error(e.getMessage(), e);
-    }
+    clientsService.createClient2("Aadus");
+
+    log.info("Client service invocation finished.");
     Assert.assertEquals(1, databasesManager.getTableRowsCount("clients.clients"));
+    Assert.assertEquals(1, databasesManager.getTableRowsCount("logs.logs"));
+    Assert.assertEquals(0, ((org.apache.tomcat.jdbc.pool.DataSource) clientsInnerDataSource).getNumActive());
+    Assert.assertEquals(0, ((org.apache.tomcat.jdbc.pool.DataSource) logsInnerDataSource).getNumActive());
   }
 
   @Test

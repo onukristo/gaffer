@@ -11,7 +11,7 @@
   <context:property-placeholder />
 
 
-  <bean id="gafferServiceRegistry" class="ee.homies.gaffer.ServiceRegistry" factory-method="createInstance" >
+  <bean id="gafferServiceRegistry" class="ee.homies.gaffer.ServiceRegistry" factory-method="createInstance">
   </bean>
 
   <bean id="gafferTransactionManager" factory-bean="gafferServiceRegistry" factory-method="getTransactionManager">
@@ -51,24 +51,26 @@
     <property name="jdbcInterceptors" value="ConnectionState;StatementFinalizer;SlowQueryReport(threshold=5000,maxQueries=5000);ResetAbandonedTimer" />
     <property name="driverClassName" value="org.hsqldb.jdbcDriver" />
   </bean>
+
+  <bean id="clientsInnerDataSource" parent="baseDataSource">
+    <property name="url" value="jdbc:hsqldb:mem:clients" />
+    <property name="username" value="SA" />
+    <property name="password" value="" />
+  </bean>
+
+  <bean id="logsInnerDataSource" parent="baseDataSource">
+    <property name="url" value="jdbc:hsqldb:mem:logs" />
+    <property name="username" value="SA" />
+    <property name="password" value="" />
+  </bean>
+
   <bean id="clientsDataSource" class="ee.homies.gaffer.jdbc.DataSourceImpl" init-method="init">
-    <property name="dataSource">
-      <bean parent="baseDataSource">
-        <property name="url" value="jdbc:hsqldb:mem:clients" />
-        <property name="username" value="SA" />
-        <property name="password" value="" />
-      </bean>
-    </property>
+    <property name="dataSource" ref="clientsInnerDataSource" />
   </bean>
+
   <bean id="logsDataSource" class="ee.homies.gaffer.jdbc.DataSourceImpl" init-method="init">
-    <property name="dataSource">
-      <bean parent="baseDataSource">
-        <property name="url" value="jdbc:hsqldb:mem:logs" />
-        <property name="username" value="SA" />
-        <property name="password" value="" />
-      </bean>
-    </property>
+    <property name="dataSource" ref="logsInnerDataSource" />
   </bean>
-  
-  <context:component-scan base-package="ee.homies.gaffer.test.suspended.app" />  
+
+  <context:component-scan base-package="ee.homies.gaffer.test.suspended.app" />
 </beans>

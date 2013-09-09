@@ -86,4 +86,19 @@ public class DatabasesManager {
       throw new RuntimeException(e);
     }
   }
+
+  public void deleteRows() {
+    deleteRows(clientsDataSource, "clients");
+    deleteRows(logsDataSource, "logs");
+  }
+
+  public void deleteRows(DataSource dataSource, String tableName) {
+    try {
+      try (Connection con = dataSource.getConnection(); PreparedStatement stmt = con.prepareStatement("delete from " + tableName);) {
+        stmt.execute();
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException(e);
+    }
+  }
 }
