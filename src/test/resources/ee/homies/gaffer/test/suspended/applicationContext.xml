@@ -11,7 +11,7 @@
   <context:property-placeholder />
 
 
-  <bean id="gafferServiceRegistry" class="ee.homies.gaffer.ServiceRegistry" factory-method="createInstance">
+  <bean id="gafferServiceRegistry" class="ee.homies.gaffer.ServiceRegistryHolder" factory-method="getServiceRegistry" destroy-method="destroy">
   </bean>
 
   <bean id="gafferTransactionManager" factory-bean="gafferServiceRegistry" factory-method="getTransactionManager">

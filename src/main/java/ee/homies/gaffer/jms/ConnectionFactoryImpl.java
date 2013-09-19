@@ -13,7 +13,7 @@ import javax.transaction.xa.XAException;
 import javax.transaction.xa.XAResource;
 import javax.transaction.xa.Xid;
 
-import ee.homies.gaffer.ServiceRegistry;
+import ee.homies.gaffer.ServiceRegistryHolder;
 import ee.homies.gaffer.util.DummyXAResource;
 import ee.homies.gaffer.util.FormatLogger;
 
@@ -60,7 +60,7 @@ public class ConnectionFactoryImpl implements ConnectionFactory {
 
     @Override
     public Session createSession(boolean transacted, int acknowledgeMode) throws JMSException {
-      TransactionSynchronizationRegistry registry = ServiceRegistry.getInstance().getTransactionSynchronizationRegistry();
+      TransactionSynchronizationRegistry registry = ServiceRegistryHolder.getServiceRegistry().getTransactionSynchronizationRegistry();
       if (registry.getTransactionStatus() == Status.STATUS_NO_TRANSACTION) {
         Session session = getConnection().createSession(transacted, acknowledgeMode);
         return session;
@@ -75,7 +75,7 @@ public class ConnectionFactoryImpl implements ConnectionFactory {
       XAResourceImpl xaResource = new XAResourceImpl(session);
       registry.putResource(sessionResourceKey, session);
 
-      ServiceRegistry.getInstance().getTransactionManager().getTransactionImpl().enlistResource(xaResource);
+      ServiceRegistryHolder.getServiceRegistry().getTransactionManager().getTransactionImpl().enlistResource(xaResource);
       return session;
     }
   }

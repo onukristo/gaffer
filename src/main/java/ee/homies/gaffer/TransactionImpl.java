@@ -28,7 +28,7 @@ public class TransactionImpl implements Transaction {
   private long timeoutMillis = -1;
 
   public TransactionImpl() {
-    ServiceRegistry serviceRegistry = ServiceRegistry.getInstance();
+    ServiceRegistry serviceRegistry = ServiceRegistryHolder.getServiceRegistry();
     String instanceId = serviceRegistry.getConfiguration().getInstanceId();
     this.clock = serviceRegistry.getClock();
     startTimeMillis = clock.currentTimeMillis();

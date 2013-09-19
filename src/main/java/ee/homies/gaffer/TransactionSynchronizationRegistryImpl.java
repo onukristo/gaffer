@@ -6,15 +6,21 @@ import javax.transaction.Synchronization;
 import javax.transaction.TransactionSynchronizationRegistry;
 
 public class TransactionSynchronizationRegistryImpl implements TransactionSynchronizationRegistry {
+  private final TransactionManagerImpl transactionManager;
+
+  public TransactionSynchronizationRegistryImpl(TransactionManagerImpl transactionManager) {
+    this.transactionManager = transactionManager;
+  }
+
   @Override
   public Object getTransactionKey() {
-    TransactionImpl transaction = ServiceRegistry.getInstance().getTransactionManager().getTransactionImpl();
+    TransactionImpl transaction = getTransaction();
     return transaction == null ? null : transaction.getGlobalTransactionId();
   }
 
   @Override
   public void putResource(Object key, Object value) {
-    TransactionImpl transaction = ServiceRegistry.getInstance().getTransactionManager().getTransactionImpl();
+    TransactionImpl transaction = getTransaction();
     if (transaction == null) {
       throw new IllegalStateException("Current thread is not associated with transaction.");
     }
@@ -23,7 +29,7 @@ public class TransactionSynchronizationRegistryImpl implements TransactionSynchr
 
   @Override
   public Object getResource(Object key) {
-    TransactionImpl transaction = ServiceRegistry.getInstance().getTransactionManager().getTransactionImpl();
+    TransactionImpl transaction = getTransaction();
     if (transaction == null) {
       throw new IllegalStateException("Current thread is not associated with transaction.");
     }
@@ -32,7 +38,7 @@ public class TransactionSynchronizationRegistryImpl implements TransactionSynchr
 
   @Override
   public void registerInterposedSynchronization(Synchronization sync) {
-    TransactionImpl transaction = ServiceRegistry.getInstance().getTransactionManager().getTransactionImpl();
+    TransactionImpl transaction = getTransaction();
     if (transaction == null) {
       throw new IllegalStateException("Current thread is not associated with transaction.");
     }
@@ -45,12 +51,12 @@ public class TransactionSynchronizationRegistryImpl implements TransactionSynchr
 
   @Override
   public int getTransactionStatus() {
-    return ServiceRegistry.getInstance().getTransactionManager().getStatus();
+    return getTransactionManager().getStatus();
   }
 
   @Override
   public void setRollbackOnly() {
-    TransactionImpl transaction = ServiceRegistry.getInstance().getTransactionManager().getTransactionImpl();
+    TransactionImpl transaction = getTransaction();
     if (transaction == null) {
       throw new IllegalStateException("Current thread is not associated with transaction.");
     }
@@ -59,11 +65,18 @@ public class TransactionSynchronizationRegistryImpl implements TransactionSynchr
 
   @Override
   public boolean getRollbackOnly() {
-    TransactionImpl transaction = ServiceRegistry.getInstance().getTransactionManager().getTransactionImpl();
+    TransactionImpl transaction = getTransaction();
     if (transaction == null) {
       throw new IllegalStateException("Current thread is not associated with transaction.");
     }
     return transaction.getStatus() == Status.STATUS_MARKED_ROLLBACK;
   }
 
+  private TransactionImpl getTransaction() {
+    return getTransactionManager().getTransactionImpl();
+  }
+
+  private TransactionManagerImpl getTransactionManager() {
+    return transactionManager;
+  }
 }

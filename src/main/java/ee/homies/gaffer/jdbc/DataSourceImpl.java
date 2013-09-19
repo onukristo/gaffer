@@ -11,7 +11,7 @@ import javax.transaction.xa.XAException;
 import javax.transaction.xa.XAResource;
 import javax.transaction.xa.Xid;
 
-import ee.homies.gaffer.ServiceRegistry;
+import ee.homies.gaffer.ServiceRegistryHolder;
 import ee.homies.gaffer.util.DummyXAResource;
 import ee.homies.gaffer.util.FormatLogger;
 
@@ -50,15 +50,19 @@ public class DataSourceImpl extends DataSourceWrapper {
     return getTransactionalConnection(username, password);
   }
 
+  private Connection getNonTransactionalConnection(String username, String password) throws SQLException {
+    log.debug("Connection requested outside of transaction.");
+    Connection con = getConnectionFromDataSource(username, password);
+    if (!con.getAutoCommit()) {
+      con.setAutoCommit(true);
+    }
+    return con;
+  }
+
   private Connection getTransactionalConnection(String username, String password) throws SQLException {
-    TransactionSynchronizationRegistry registry = ServiceRegistry.getInstance().getTransactionSynchronizationRegistry();
+    TransactionSynchronizationRegistry registry = ServiceRegistryHolder.getServiceRegistry().getTransactionSynchronizationRegistry();
     if (registry.getTransactionStatus() == Status.STATUS_NO_TRANSACTION) {
-      log.debug("Connection requested outside of transaction.");
-      Connection con = getConnectionFromDataSource(username, password);
-      if (!con.getAutoCommit()) {
-        con.setAutoCommit(true);
-      }
-      return con;
+      return getNonTransactionalConnection(username, password);
     }
     ConnectionImpl con = (ConnectionImpl) registry.getResource(connectionResourceKey);
     if (con == null) {
@@ -69,7 +73,7 @@ public class DataSourceImpl extends DataSourceWrapper {
       }
       registry.putResource(connectionResourceKey, con);
       XAResource xaResource = new XAResourceImpl(con);
-      ServiceRegistry.getInstance().getTransactionManager().getTransactionImpl().enlistResource(xaResource);
+      ServiceRegistryHolder.getServiceRegistry().getTransactionManager().getTransactionImpl().enlistResource(xaResource);
     }
     return con;
   }
