@@ -7,7 +7,7 @@ import javax.transaction.*;
 public class UserTransactionImpl implements UserTransaction, Serializable {
   private static final long serialVersionUID = 1L;
 
-  private final TransactionManagerImpl transactionManager;
+  private transient TransactionManagerImpl transactionManager;
 
   public UserTransactionImpl(TransactionManagerImpl transactionManager) {
     this.transactionManager = transactionManager;
@@ -44,6 +44,9 @@ public class UserTransactionImpl implements UserTransaction, Serializable {
   }
 
   private TransactionManagerImpl getTransactionManager() {
+    if (transactionManager == null) {
+      transactionManager = ServiceRegistryHolder.getServiceRegistry().getTransactionManager();
+    }
     return transactionManager;
   }
 
