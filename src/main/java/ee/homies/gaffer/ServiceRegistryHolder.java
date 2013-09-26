@@ -4,6 +4,17 @@ public class ServiceRegistryHolder {
   private static volatile ServiceRegistry serviceRegistry;
   private static volatile Configuration configuration;
 
+  public static Configuration getConfiguration() {
+    if (configuration == null) {
+      synchronized (ServiceRegistryHolder.class) {
+        if (configuration == null) {
+          createConfiguration();
+        }
+      }
+    }
+    return configuration;
+  }
+
   public static ServiceRegistry getServiceRegistry() {
     if (serviceRegistry == null) {
       synchronized (ServiceRegistryHolder.class) {
@@ -23,9 +34,10 @@ public class ServiceRegistryHolder {
   }
 
   private static void createServiceRegistry() {
-    if (configuration == null) {
-      configuration = new Configuration();
-    }
-    serviceRegistry = new ServiceRegistry(configuration);
+    serviceRegistry = new ServiceRegistry(getConfiguration());
+  }
+
+  private static void createConfiguration() {
+    configuration = new Configuration();
   }
 }

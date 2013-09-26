@@ -16,8 +16,8 @@ public class ServiceRegistry {
   protected ServiceRegistry(Configuration configuration) {
     this.configuration = configuration;
     transactionManagerStatistics = new TransactionManagerStatistics();
-    transactionManager = new TransactionManagerImpl(transactionManagerStatistics);
-    transactionSynchronizationRegistry = new TransactionSynchronizationRegistryImpl(transactionManager);
+    transactionManager = new TransactionManagerImpl(transactionManagerStatistics, configuration);
+    transactionSynchronizationRegistry = new TransactionSynchronizationRegistryImpl(transactionManager, configuration);
     userTransaction = new UserTransactionImpl(transactionManager);
     clock = new MonotonicClock();
   }

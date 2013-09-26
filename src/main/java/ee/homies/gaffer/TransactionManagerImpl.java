@@ -2,6 +2,7 @@ package ee.homies.gaffer;
 
 import javax.transaction.*;
 
+import ee.homies.gaffer.util.ExceptionThrower;
 import ee.homies.gaffer.util.FormatLogger;
 
 public class TransactionManagerImpl implements TransactionManager {
@@ -11,16 +12,18 @@ public class TransactionManagerImpl implements TransactionManager {
   private final ThreadLocal<Integer> transactionTimeoutsSeconds = new ThreadLocal<>();
 
   private final TransactionManagerStatistics statistics;
+  private final ExceptionThrower exceptionThrower;
 
-  public TransactionManagerImpl(TransactionManagerStatistics statistics) {
+  public TransactionManagerImpl(TransactionManagerStatistics statistics, Configuration configuration) {
     this.statistics = statistics;
+    exceptionThrower = new ExceptionThrower(configuration.isLogExceptions());
   }
 
   @Override
   public void begin() throws NotSupportedException, SystemException {
     Transaction transaction = getTransaction();
     if (transaction != null) {
-      throw new NotSupportedException("Nested transactions are not supported.");
+      exceptionThrower.throwException(new NotSupportedException("Nested transactions are not supported."));
     }
 
     TransactionImpl transactionImpl = new TransactionImpl();
@@ -34,13 +37,13 @@ public class TransactionManagerImpl implements TransactionManager {
   public void commit() throws RollbackException, HeuristicMixedException, HeuristicRollbackException, SecurityException, IllegalStateException, SystemException {
     TransactionImpl transaction = getTransactionImpl();
     if (transaction == null) {
-      throw new IllegalStateException("Can not commit. Current thread is not associated with transaction.");
-    }
-
-    try {
-      transaction.commit();
-    } finally {
-      transactions.remove();
+      exceptionThrower.throwException(new IllegalStateException("Can not commit. Current thread is not associated with transaction."));
+    } else {
+      try {
+        transaction.commit();
+      } finally {
+        transactions.remove();
+      }
     }
   }
 
@@ -83,13 +86,13 @@ public class TransactionManagerImpl implements TransactionManager {
   public void rollback() throws IllegalStateException, SecurityException, SystemException {
     TransactionImpl transaction = getTransactionImpl();
     if (transaction == null) {
-      throw new IllegalStateException("Can not rollback. Current thread is not associated with transaction.");
-    }
-
-    try {
-      transaction.rollback();
-    } finally {
-      transactions.remove();
+      exceptionThrower.throwException(new IllegalStateException("Can not rollback. Current thread is not associated with transaction."));
+    } else {
+      try {
+        transaction.rollback();
+      } finally {
+        transactions.remove();
+      }
     }
   }
 
@@ -97,9 +100,10 @@ public class TransactionManagerImpl implements TransactionManager {
   public void setRollbackOnly() throws IllegalStateException, SystemException {
     Transaction transaction = getTransaction();
     if (transaction == null) {
-      throw new IllegalStateException("Can not mark to rollback. Current thread is not associated with transaction.");
+      exceptionThrower.throwException(new IllegalStateException("Can not mark to rollback. Current thread is not associated with transaction."));
+    } else {
+      transaction.setRollbackOnly();
     }
-    transaction.setRollbackOnly();
   }
 
   @Override

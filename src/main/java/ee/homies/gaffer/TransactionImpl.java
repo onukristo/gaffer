@@ -28,6 +28,7 @@ public class TransactionImpl implements Transaction {
   private long timeoutMillis = -1;
   private boolean notAbandoned;
   private boolean suspended;
+  private final ExceptionThrower exceptionThrower;
 
   public TransactionImpl() {
     ServiceRegistry serviceRegistry = ServiceRegistryHolder.getServiceRegistry();
@@ -35,6 +36,7 @@ public class TransactionImpl implements Transaction {
     this.clock = serviceRegistry.getClock();
     startTimeMillis = clock.currentTimeMillis();
     globalTransactionId = new UidImpl(instanceId, startTimeMillis);
+    exceptionThrower = new ExceptionThrower(serviceRegistry.getConfiguration().isLogExceptions());
   }
 
   public void setSuspended(boolean suspended) {
@@ -43,14 +45,14 @@ public class TransactionImpl implements Transaction {
 
   public void putResource(Object key, Object val) {
     if (key == null) {
-      throw new IllegalArgumentException("Resource key can not be null.");
+      exceptionThrower.throwException(new IllegalArgumentException("Resource key can not be null."));
     }
     resources.put(key, val);
   }
 
   public Object getResource(Object key) {
     if (key == null) {
-      throw new IllegalArgumentException("Resource key can not be null.");
+      exceptionThrower.throwException(new IllegalArgumentException("Resource key can not be null."));
     }
     return resources.get(key);
   }
@@ -71,27 +73,28 @@ public class TransactionImpl implements Transaction {
       log.debug("Committing transaction '%s'.", getTransactionInfo());
     }
     if (status == Status.STATUS_NO_TRANSACTION) {
-      throw new IllegalStateException("Can not commit '" + getTransactionInfo() + "'. Transaction has not been started.");
+      exceptionThrower.throwException(new IllegalStateException("Can not commit '" + getTransactionInfo() + "'. Transaction has not been started."));
     }
     if (isDoneOrFinishing()) {
-      throw new IllegalStateException("Can not commit '" + getTransactionInfo() + "' with status '" + status + "''. Transaction is finishing or finished.");
+      exceptionThrower.throwException(new IllegalStateException("Can not commit '" + getTransactionInfo() + "' with status '" + status
+          + "''. Transaction is finishing or finished."));
     }
 
     try {
       fireBeforeCompletionEvent();
     } catch (RuntimeException e) {
       rollback();
-      throw new RollbackExceptionImpl("Can not commit '" + getTransactionInfo() + "'. Before completion event firing failed.", e);
+      exceptionThrower.throwException(new RollbackExceptionImpl("Can not commit '" + getTransactionInfo() + "'. Before completion event firing failed.", e));
     }
 
     if (status == Status.STATUS_MARKED_ROLLBACK) {
       rollback();
-      throw new RollbackExceptionImpl("Can not commit '" + getTransactionInfo() + "'. Transaction was marked as to be rolled back.");
+      exceptionThrower.throwException(new RollbackExceptionImpl("Can not commit '" + getTransactionInfo() + "'. Transaction was marked as to be rolled back."));
     }
 
     if (isTimedOut()) {
       rollback();
-      throw new RollbackExceptionImpl("Can not commit '" + getTransactionInfo() + "'. Transaction has timed out.");
+      exceptionThrower.throwException(new RollbackExceptionImpl("Can not commit '" + getTransactionInfo() + "'. Transaction has timed out."));
     }
 
     try {
@@ -115,9 +118,9 @@ public class TransactionImpl implements Transaction {
         }
         rollback();
         if (idx == 0) {
-          throw new RollbackExceptionImpl("Can not commit '" + getTransactionInfo() + "'. Commiting a resource failed.", ex);
+          exceptionThrower.throwException(new RollbackExceptionImpl("Can not commit '" + getTransactionInfo() + "'. Commiting a resource failed.", ex));
         }
-        throw new HeuristicMixedExceptionImpl("Can not commit '" + getTransactionInfo() + "'. Commiting a resource failed.", ex);
+        exceptionThrower.throwException(new HeuristicMixedExceptionImpl("Can not commit '" + getTransactionInfo() + "'. Commiting a resource failed.", ex));
       }
       setStatus(Status.STATUS_COMMITTED);
       notAbandoned = true;
@@ -138,10 +141,10 @@ public class TransactionImpl implements Transaction {
       log.debug("Delisting resource '%s' for transaction '%s'.", xaRes, getTransactionInfo());
     }
     if (status == Status.STATUS_NO_TRANSACTION) {
-      throw new IllegalStateException("Can not delist resource. Transaction '" + getTransactionInfo() + "' has not been started.");
+      exceptionThrower.throwException(new IllegalStateException("Can not delist resource. Transaction '" + getTransactionInfo() + "' has not been started."));
     }
     if (isWorking()) {
-      throw new IllegalStateException("Can not delist resource. Transaction '" + getTransactionInfo() + "' commit is in progress.");
+      exceptionThrower.throwException(new IllegalStateException("Can not delist resource. Transaction '" + getTransactionInfo() + "' commit is in progress."));
     }
     return xaResources.remove(xaRes);
   }
@@ -152,20 +155,21 @@ public class TransactionImpl implements Transaction {
       log.debug("Enlisting resource '%s' for transaction '%s'.", xaRes, getTransactionInfo());
     }
     if (status == Status.STATUS_NO_TRANSACTION) {
-      throw new IllegalStateException("Can not enlist resource. Transaction '" + getTransactionInfo() + "' has not been started.");
+      exceptionThrower.throwException(new IllegalStateException("Can not enlist resource. Transaction '" + getTransactionInfo() + "' has not been started."));
     }
     if (status == Status.STATUS_MARKED_ROLLBACK) {
-      throw new IllegalStateException("Can not enlist resource. Transaction '" + getTransactionInfo() + "' has been marked to roll back.");
+      exceptionThrower.throwException(new IllegalStateException("Can not enlist resource. Transaction '" + getTransactionInfo()
+          + "' has been marked to roll back."));
     }
     if (isDoneOrFinishing()) {
-      throw new IllegalStateException("Can not enlist resource. Transaction '" + getTransactionInfo() + "' is finished or finishing.");
+      exceptionThrower
+          .throwException(new IllegalStateException("Can not enlist resource. Transaction '" + getTransactionInfo() + "' is finished or finishing."));
     }
     if (!(xaRes instanceof DummyXAResource)) {
-      throw new IllegalStateException("Full XA is not supported yet for transaction '" + getTransactionInfo() + "', only " + DummyXAResource.class
-          + " can participate.");
+      exceptionThrower.throwException(new IllegalStateException("Full XA is not supported yet for transaction '" + getTransactionInfo() + "', only "
+          + DummyXAResource.class + " can participate."));
     }
     xaResources.add(xaRes);
-
     return true;
   }
 
@@ -181,7 +185,7 @@ public class TransactionImpl implements Transaction {
     }
 
     if (getStatus() == Status.STATUS_MARKED_ROLLBACK) {
-      throw new RollbackException("Transaction is marked as rollback-only.");
+      exceptionThrower.throwException(new RollbackException("Transaction is marked as rollback-only."));
     }
     synchronizations.add(sync);
   }
@@ -214,7 +218,7 @@ public class TransactionImpl implements Transaction {
       getTransactionManagerStatistics().markRollback(suspended);
     } catch (RuntimeException e) {
       getTransactionManagerStatistics().markRollbackFailure(suspended);
-      throw e;
+      exceptionThrower.throwException(e);
     }
   }
 
