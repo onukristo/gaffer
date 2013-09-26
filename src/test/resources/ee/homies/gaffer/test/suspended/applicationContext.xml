@@ -65,10 +65,12 @@
   </bean>
 
   <bean id="clientsDataSource" class="ee.homies.gaffer.jdbc.DataSourceImpl" init-method="init">
+    <property name="uniqueName" value="clients" />
     <property name="dataSource" ref="clientsInnerDataSource" />
   </bean>
 
   <bean id="logsDataSource" class="ee.homies.gaffer.jdbc.DataSourceImpl" init-method="init">
+    <property name="uniqueName" value="logs" />
     <property name="dataSource" ref="logsInnerDataSource" />
   </bean>
 

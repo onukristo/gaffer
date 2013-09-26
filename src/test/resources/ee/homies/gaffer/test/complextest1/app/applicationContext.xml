@@ -8,7 +8,7 @@
 
   <context:annotation-config />
   <context:component-scan base-package="ee.homies.gaffer.test.complextest1.app" />
-  
+
   <tx:annotation-driven transaction-manager="transactionManager" />
 
   <context:property-placeholder />
@@ -54,6 +54,7 @@
     <property name="driverClassName" value="org.hsqldb.jdbcDriver" />
   </bean>
   <bean id="clientsDataSource" class="ee.homies.gaffer.jdbc.DataSourceImpl" init-method="init">
+    <property name="uniqueName" value="clients" />
     <property name="dataSource">
       <bean parent="baseDataSource">
         <property name="url" value="jdbc:hsqldb:mem:clients" />
@@ -63,6 +64,7 @@
     </property>
   </bean>
   <bean id="usersDataSource" class="ee.homies.gaffer.jdbc.DataSourceImpl" init-method="init">
+    <property name="uniqueName" value="users" />
     <property name="dataSource">
       <bean parent="baseDataSource">
         <property name="url" value="jdbc:hsqldb:mem:users" />
@@ -72,6 +74,7 @@
     </property>
   </bean>
   <bean id="secretsDataSource" class="ee.homies.gaffer.jdbc.DataSourceImpl" init-method="init">
+    <property name="uniqueName" value="secrets" />
     <property name="dataSource">
       <bean id="secretsInnerDatasource" parent="baseDataSource">
         <property name="url" value="${database.secrets.url}" />
@@ -81,6 +84,7 @@
     </property>
   </bean>
   <bean id="accountsDataSource" class="ee.homies.gaffer.jdbc.DataSourceImpl" init-method="init">
+    <property name="uniqueName" value="accounts" />
     <property name="dataSource">
       <bean parent="baseDataSource">
         <property name="url" value="jdbc:hsqldb:mem:accounts" />
@@ -90,6 +94,7 @@
     </property>
   </bean>
   <bean id="clientsAdminDataSource" class="ee.homies.gaffer.jdbc.DataSourceImpl" init-method="init">
+    <property name="uniqueName" value="clientsAdmin" />
     <property name="dataSource">
       <bean parent="baseDataSource">
         <property name="url" value="jdbc:hsqldb:mem:clients" />
@@ -99,6 +104,7 @@
     </property>
   </bean>
   <bean id="usersAdminDataSource" class="ee.homies.gaffer.jdbc.DataSourceImpl" init-method="init">
+    <property name="uniqueName" value="usersAdmin" />
     <property name="dataSource">
       <bean parent="baseDataSource">
         <property name="url" value="jdbc:hsqldb:mem:users" />
@@ -108,6 +114,7 @@
     </property>
   </bean>
   <bean id="secretsAdminDataSource" class="ee.homies.gaffer.jdbc.DataSourceImpl" init-method="init">
+    <property name="uniqueName" value="secretsAdmin" />
     <property name="dataSource">
       <bean id="secretsInnerDatasource" parent="baseDataSource">
         <property name="url" value="jdbc:hsqldb:mem:secrets" />
@@ -117,6 +124,7 @@
     </property>
   </bean>
   <bean id="accountsAdminDataSource" class="ee.homies.gaffer.jdbc.DataSourceImpl" init-method="init">
+    <property name="uniqueName" value="accountsAdmin" />
     <property name="dataSource">
       <bean parent="baseDataSource">
         <property name="url" value="jdbc:hsqldb:mem:accounts" />

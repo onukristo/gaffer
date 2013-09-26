@@ -10,6 +10,12 @@ public class TransactionManagerImpl implements TransactionManager {
   private final ThreadLocal<TransactionImpl> transactions = new ThreadLocal<>();
   private final ThreadLocal<Integer> transactionTimeoutsSeconds = new ThreadLocal<>();
 
+  private final TransactionManagerStatistics statistics;
+
+  public TransactionManagerImpl(TransactionManagerStatistics statistics) {
+    this.statistics = statistics;
+  }
+
   @Override
   public void begin() throws NotSupportedException, SystemException {
     Transaction transaction = getTransaction();
@@ -20,6 +26,8 @@ public class TransactionManagerImpl implements TransactionManager {
     TransactionImpl transactionImpl = new TransactionImpl();
     transactionImpl.begin(transactionTimeoutsSeconds.get());
     transactions.set(transactionImpl);
+
+    statistics.markBegin();
   }
 
   @Override
@@ -66,6 +74,9 @@ public class TransactionManagerImpl implements TransactionManager {
       log.debug("Resuming transaction '%s'.", transactionImpl.getTransactionInfo());
     }
     transactions.set(transactionImpl);
+    transactionImpl.setSuspended(false);
+
+    statistics.markResume();
   }
 
   @Override
@@ -104,10 +115,16 @@ public class TransactionManagerImpl implements TransactionManager {
       if (log.isDebugEnabled()) {
         log.debug("Suspending transaction '" + transaction.getTransactionInfo() + "'.");
       }
+      transaction.setSuspended(true);
       transactions.remove();
+      statistics.markSuspend();
     } else {
       log.debug("Suspend called for non-existent transaction.");
     }
     return transaction;
+  }
+
+  public TransactionManagerStatistics getTransactionManagerStatistics() {
+    return statistics;
   }
 }

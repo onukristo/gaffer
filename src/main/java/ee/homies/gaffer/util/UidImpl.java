@@ -45,6 +45,7 @@ public class UidImpl implements Uid {
   }
 
   @Override
+  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP", justification = "Performance is important.")
   public byte[] asBytes() {
     return bytes;
   }

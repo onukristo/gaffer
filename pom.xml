@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>ee.homies.gaffer</groupId>
   <artifactId>gaffer</artifactId>
-  <version>0.0.4</version>
+  <version>0.0.5</version>
   <name>Gaffer</name>
 
   <properties>
@@ -52,7 +52,7 @@
           </execution>
         </executions>
       </plugin>
-    </plugins>    
+    </plugins>
   </build>
 
   <dependencies>
@@ -80,6 +80,12 @@
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-lang3</artifactId>
       <version>3.1</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.code.findbugs</groupId>
+      <artifactId>annotations</artifactId>
+      <version>2.0.1</version>
+      <scope>provided</scope>
     </dependency>
 
 	<!-- TEST begin -->

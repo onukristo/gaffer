@@ -26,6 +26,8 @@ public class TransactionImpl implements Transaction {
   private final Clock clock;
   private final long startTimeMillis;
   private long timeoutMillis = -1;
+  private boolean notAbandoned;
+  private boolean suspended;
 
   public TransactionImpl() {
     ServiceRegistry serviceRegistry = ServiceRegistryHolder.getServiceRegistry();
@@ -33,6 +35,10 @@ public class TransactionImpl implements Transaction {
     this.clock = serviceRegistry.getClock();
     startTimeMillis = clock.currentTimeMillis();
     globalTransactionId = new UidImpl(instanceId, startTimeMillis);
+  }
+
+  public void setSuspended(boolean suspended) {
+    this.suspended = suspended;
   }
 
   public void putResource(Object key, Object val) {
@@ -104,6 +110,9 @@ public class TransactionImpl implements Transaction {
       }
 
       if (ex != null) {
+        if (idx > 0) {
+          getTransactionManagerStatistics().markHeuristicCommit();
+        }
         rollback();
         if (idx == 0) {
           throw new RollbackExceptionImpl("Can not commit '" + getTransactionInfo() + "'. Commiting a resource failed.", ex);
@@ -111,6 +120,8 @@ public class TransactionImpl implements Transaction {
         throw new HeuristicMixedExceptionImpl("Can not commit '" + getTransactionInfo() + "'. Commiting a resource failed.", ex);
       }
       setStatus(Status.STATUS_COMMITTED);
+      notAbandoned = true;
+      getTransactionManagerStatistics().markCommitted(suspended);
       if (log.isDebugEnabled()) {
         log.debug("Transaction '%s' successfully commited.", getTransactionInfo());
       }
@@ -184,20 +195,27 @@ public class TransactionImpl implements Transaction {
 
   @Override
   public void rollback() {
-    if (log.isDebugEnabled()) {
-      log.debug("Rolling back transaction '%s'.", getTransactionInfo());
-    }
-    setStatus(Status.STATUS_ROLLING_BACK);
-    for (XAResource xaResource : xaResources) {
-      try {
-        xaResource.rollback(null);
-      } catch (XAException e) {
-        log.error("Rollback failed.", e);
+    try {
+      notAbandoned = true;
+      if (log.isDebugEnabled()) {
+        log.debug("Rolling back transaction '%s'.", getTransactionInfo());
       }
+      setStatus(Status.STATUS_ROLLING_BACK);
+      for (XAResource xaResource : xaResources) {
+        try {
+          xaResource.rollback(null);
+        } catch (XAException e) {
+          log.error("Rollback failed.", e);
+        }
+      }
+      xaResources.clear();
+      resources.clear();
+      setStatus(Status.STATUS_ROLLEDBACK);
+      getTransactionManagerStatistics().markRollback(suspended);
+    } catch (RuntimeException e) {
+      getTransactionManagerStatistics().markRollbackFailure(suspended);
+      throw e;
     }
-    xaResources.clear();
-    resources.clear();
-    setStatus(Status.STATUS_ROLLEDBACK);
   }
 
   @Override
@@ -285,6 +303,25 @@ public class TransactionImpl implements Transaction {
     return globalTransactionId + "/" + TransactionStatuses.toString(getStatus());
   }
 
+  @Override
+  protected void finalize() throws Throwable {
+    try {
+      if (!notAbandoned) {
+        getTransactionManagerStatistics().markAbandoned();
+      }
+    } finally {
+      super.finalize();
+    }
+  }
+
+  private TransactionManagerImpl getTransactionManager() {
+    return ServiceRegistryHolder.getServiceRegistry().getTransactionManager();
+  }
+
+  private TransactionManagerStatistics getTransactionManagerStatistics() {
+    return getTransactionManager().getTransactionManagerStatistics();
+  }
+
   private boolean isDoneOrFinishing() {
     switch (status) {
     case Status.STATUS_PREPARING:
@@ -294,8 +331,9 @@ public class TransactionImpl implements Transaction {
     case Status.STATUS_ROLLING_BACK:
     case Status.STATUS_ROLLEDBACK:
       return true;
+    default:
+      return false;
     }
-    return false;
   }
 
   private boolean isWorking() {
@@ -305,7 +343,8 @@ public class TransactionImpl implements Transaction {
     case Status.STATUS_COMMITTING:
     case Status.STATUS_ROLLING_BACK:
       return true;
+    default:
+      return false;
     }
-    return false;
   }
 }

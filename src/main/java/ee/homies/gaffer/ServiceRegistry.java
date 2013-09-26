@@ -11,10 +11,12 @@ public class ServiceRegistry {
   private final UserTransactionImpl userTransaction;
   private final Configuration configuration;
   private final Clock clock;
+  private final TransactionManagerStatistics transactionManagerStatistics;
 
   protected ServiceRegistry(Configuration configuration) {
     this.configuration = configuration;
-    transactionManager = new TransactionManagerImpl();
+    transactionManagerStatistics = new TransactionManagerStatistics();
+    transactionManager = new TransactionManagerImpl(transactionManagerStatistics);
     transactionSynchronizationRegistry = new TransactionSynchronizationRegistryImpl(transactionManager);
     userTransaction = new UserTransactionImpl(transactionManager);
     clock = new MonotonicClock();
@@ -43,4 +45,7 @@ public class ServiceRegistry {
     return clock;
   }
 
+  public TransactionManagerStatistics getTransactionManagerStatistics() {
+    return transactionManagerStatistics;
+  }
 }

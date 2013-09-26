@@ -6,14 +6,15 @@
            http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx.xsd
            http://activemq.apache.org/schema/core http://activemq.apache.org/schema/core/activemq-core.xsd">
 
-  <context:component-scan base-package="ee.homies.gaffer.test.complextest1.jms" />           
-           
+  <context:component-scan base-package="ee.homies.gaffer.test.complextest1.jms" />
+
   <amq:broker id="messagingBroker">
     <amq:transportConnectors>
       <amq:transportConnector uri="tcp://localhost:0" />
     </amq:transportConnectors>
   </amq:broker>
   <bean id="jmsFactory" class="ee.homies.gaffer.jms.ConnectionFactoryImpl" init-method="init">
+    <property name="uniqueName" value="activeMq" />
     <property name="connectionFactory">
       <bean class="org.apache.activemq.ActiveMQConnectionFactory">
         <property name="brokerURL">

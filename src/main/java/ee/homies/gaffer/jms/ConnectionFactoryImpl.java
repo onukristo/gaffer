@@ -13,22 +13,44 @@ import javax.transaction.xa.XAException;
 import javax.transaction.xa.XAResource;
 import javax.transaction.xa.Xid;
 
+import org.apache.commons.lang3.StringUtils;
+
 import ee.homies.gaffer.ServiceRegistryHolder;
 import ee.homies.gaffer.util.DummyXAResource;
 import ee.homies.gaffer.util.FormatLogger;
+import ee.homies.gaffer.util.MBeanUtil;
+import ee.homies.gaffer.util.XAExceptionImpl;
 
-public class ConnectionFactoryImpl implements ConnectionFactory {
+public class ConnectionFactoryImpl implements ConnectionFactory, ConnectionFactoryMXBean {
   private final static FormatLogger log = new FormatLogger(ConnectionFactoryImpl.class);
 
   private ConnectionFactory connectionFactory;
   private static AtomicLong idSequence = new AtomicLong();
   private String id;
   private String sessionResourceKey;
+  private String uniqueName;
+
+  private final AtomicLong allSessionGetsCount = new AtomicLong();
+  private final AtomicLong bufferedSessionGetsCount = new AtomicLong();
+  private final AtomicLong nonTransactionalSessionGetsCount = new AtomicLong();
 
   @PostConstruct
   public void init() {
+    if (StringUtils.isEmpty(uniqueName)) {
+      throw new IllegalStateException("Unique name is not set.");
+    }
     id = ConnectionFactoryImpl.class.getName() + "." + String.valueOf(idSequence.incrementAndGet());
     sessionResourceKey = id + ".ses";
+
+    MBeanUtil.registerMBeanQuietly(this, "ee.homies.gaffer:type=JmsConnectionFactory,name=" + uniqueName);
+  }
+
+  public String getUniqueName() {
+    return uniqueName;
+  }
+
+  public void setUniqueName(String uniqueName) {
+    this.uniqueName = uniqueName;
   }
 
   public ConnectionFactory getConnectionFactory() {
@@ -61,13 +83,17 @@ public class ConnectionFactoryImpl implements ConnectionFactory {
     @Override
     public Session createSession(boolean transacted, int acknowledgeMode) throws JMSException {
       TransactionSynchronizationRegistry registry = ServiceRegistryHolder.getServiceRegistry().getTransactionSynchronizationRegistry();
+      allSessionGetsCount.incrementAndGet();
       if (registry.getTransactionStatus() == Status.STATUS_NO_TRANSACTION) {
-        Session session = getConnection().createSession(transacted, acknowledgeMode);
-        return session;
+        return createNonTransactionalSession(transacted, acknowledgeMode);
       }
+      return createTransactionalSession(registry);
+    }
 
+    private Session createTransactionalSession(TransactionSynchronizationRegistry registry) throws JMSException {
       SessionImpl session = (SessionImpl) registry.getResource(sessionResourceKey);
       if (session != null) {
+        bufferedSessionGetsCount.incrementAndGet();
         return session;
       }
       Session jmsSession = getConnection().createSession(true, Session.SESSION_TRANSACTED);
@@ -78,9 +104,15 @@ public class ConnectionFactoryImpl implements ConnectionFactory {
       ServiceRegistryHolder.getServiceRegistry().getTransactionManager().getTransactionImpl().enlistResource(xaResource);
       return session;
     }
+
+    private Session createNonTransactionalSession(boolean transacted, int acknowledgeMode) throws JMSException {
+      Session session = getConnection().createSession(transacted, acknowledgeMode);
+      nonTransactionalSessionGetsCount.incrementAndGet();
+      return session;
+    }
   }
 
-  private class SessionImpl extends XASessionWrapper {
+  private static class SessionImpl extends XASessionWrapper {
     public SessionImpl(Session session, XAResource xaResource) {
       super(session, xaResource);
     }
@@ -112,8 +144,7 @@ public class ConnectionFactoryImpl implements ConnectionFactory {
         try {
           session.commit();
         } catch (JMSException e) {
-          log.error(e.getMessage(), e);
-          throw new XAException(XAException.XAER_RMERR);
+          throw new XAExceptionImpl(XAException.XAER_RMERR, e);
         }
       } finally {
         try {
@@ -131,7 +162,7 @@ public class ConnectionFactoryImpl implements ConnectionFactory {
           session.rollback();
         } catch (JMSException e) {
           log.error(e.getMessage(), e);
-          throw new XAException(XAException.XAER_RMERR);
+          throw new XAExceptionImpl(XAException.XAER_RMERR, e);
         }
       } finally {
         try {
@@ -141,5 +172,23 @@ public class ConnectionFactoryImpl implements ConnectionFactory {
         }
       }
     }
+  }
+
+  @Override
+  public long getAllSessionGetsCount() {
+    // TODO Auto-generated method stub
+    return 0;
+  }
+
+  @Override
+  public long getBufferedSessionGetsCount() {
+    // TODO Auto-generated method stub
+    return 0;
+  }
+
+  @Override
+  public long getNonTransactionalSessionGetsCount() {
+    // TODO Auto-generated method stub
+    return 0;
   }
 }
