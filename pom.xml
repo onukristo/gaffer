@@ -11,6 +11,7 @@
     <maven.compiler.source>1.7</maven.compiler.source>
     <maven.compiler.compilerVersion>1.7</maven.compiler.compilerVersion>
     <maven.compiler.showDeprecation>true</maven.compiler.showDeprecation>
+    <maven.compiler.showWarnings>true</maven.compiler.showWarnings>
     <maven.compiler.debug>true</maven.compiler.debug>
     <maven.compiler.debuglevel>lines,vars,source</maven.compiler.debuglevel>
 
@@ -51,6 +52,18 @@
             </goals>
           </execution>
         </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.1</version>
+        <configuration>
+          <compilerArgs>
+            <arg>-Xmaxerrs=100</arg>
+            <arg>-Xmaxwarns=100</arg>
+            <arg>-Xlint</arg>
+          </compilerArgs>
+        </configuration>
       </plugin>
     </plugins>
   </build>
