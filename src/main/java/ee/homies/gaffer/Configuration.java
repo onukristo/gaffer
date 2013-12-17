@@ -24,4 +24,5 @@ public class Configuration {
   public void setLogExceptions(boolean logExceptions) {
     this.logExceptions = logExceptions;
   }
+
 }
