@@ -87,7 +87,7 @@ public class TransactionManagerStatistics implements TransactionManagerStatistic
   }
 
   public void markRollback(boolean wasSuspended) {
-    abandonedTransactionsCount.incrementAndGet();
+    rolledBackTransactionsCount.incrementAndGet();
     if (wasSuspended) {
       suspendedTransactionsCount.decrementAndGet();
     } else {

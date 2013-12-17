@@ -312,6 +312,7 @@ public class TransactionImpl implements Transaction {
     try {
       if (!notAbandoned) {
         getTransactionManagerStatistics().markAbandoned();
+        log.warn("Transaction '%s' was abandoned.", getTransactionInfo());
       }
     } finally {
       super.finalize();

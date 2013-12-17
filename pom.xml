@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>ee.homies.gaffer</groupId>
   <artifactId>gaffer</artifactId>
-  <version>0.0.6</version>
+  <version>0.0.8</version>
   <name>Gaffer</name>
 
   <properties>
