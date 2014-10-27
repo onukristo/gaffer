@@ -27,6 +27,7 @@ public class DataSourceImpl extends DataSourceWrapper implements DataSourceMXBea
   private String id;
   private String connectionResourceKey;
   private String uniqueName;
+  private AutoCommitStrategy beforeReleaseAutoCommitStrategy = AutoCommitStrategy.NONE;
 
   private final AtomicLong allConnectionGetsCount = new AtomicLong();
   private final AtomicLong bufferedConnectionGetsCount = new AtomicLong();
@@ -42,6 +43,14 @@ public class DataSourceImpl extends DataSourceWrapper implements DataSourceMXBea
     connectionResourceKey = id + ".con";
 
     MBeanUtil.registerMBeanQuietly(this, "ee.homies.gaffer:type=JdbcDataSource,name=" + uniqueName);
+  }
+
+  public AutoCommitStrategy getBeforeReleaseAutoCommitStrategy() {
+    return beforeReleaseAutoCommitStrategy;
+  }
+
+  public void setBeforeReleaseAutoCommitStrategy(AutoCommitStrategy beforeReleaseAutoCommitStrategy) {
+    this.beforeReleaseAutoCommitStrategy = beforeReleaseAutoCommitStrategy;
   }
 
   public String getUniqueName() {
@@ -64,11 +73,7 @@ public class DataSourceImpl extends DataSourceWrapper implements DataSourceMXBea
 
   private Connection getNonTransactionalConnection(String username, String password) throws SQLException {
     log.debug("Connection requested outside of transaction.");
-    Connection con = getConnectionFromDataSource(username, password);
-    if (!con.getAutoCommit()) {
-      autoCommitSwitchingsCount.incrementAndGet();
-      con.setAutoCommit(true);
-    }
+    NonTransactionalConnectionImpl con = new NonTransactionalConnectionImpl(this, getConnectionFromDataSource(username, password));
     nonTransactionalConnectionGetsCount.incrementAndGet();
     return con;
   }
@@ -85,13 +90,9 @@ public class DataSourceImpl extends DataSourceWrapper implements DataSourceMXBea
 
   private Connection getTransactionalConnection(ServiceRegistry serviceRegistry, TransactionSynchronizationRegistry registry, String username, String password)
       throws SQLException {
-    ConnectionImpl con = (ConnectionImpl) registry.getResource(connectionResourceKey);
+    TransactionalConnectionImpl con = (TransactionalConnectionImpl) registry.getResource(connectionResourceKey);
     if (con == null) {
-      con = new ConnectionImpl(getConnectionFromDataSource(username, password));
-      if (con.getAutoCommit()) {
-        autoCommitSwitchingsCount.incrementAndGet();
-        con.setAutoCommit(false);
-      }
+      con = new TransactionalConnectionImpl(this, getConnectionFromDataSource(username, password));
       registry.putResource(connectionResourceKey, con);
       XAResource xaResource = new XAResourceImpl(con);
       serviceRegistry.getTransactionManager().getTransactionImpl().enlistResource(xaResource);
@@ -108,18 +109,49 @@ public class DataSourceImpl extends DataSourceWrapper implements DataSourceMXBea
       }
       return getDataSource().getConnection(username, password);
     } catch (SQLException e) {
-      e.printStackTrace();
       throw e;
     }
   }
 
-  public static class ConnectionImpl extends ConnectionWrapper {
-    public ConnectionImpl(Connection con) {
+  private void setAutoCommit(Connection con, boolean autoCommit) throws SQLException {
+    boolean currentAutoCommit = con.getAutoCommit();
+
+    if (currentAutoCommit != autoCommit) {
+      autoCommitSwitchingsCount.incrementAndGet();
+      con.setAutoCommit(autoCommit);
+    }
+  }
+
+  private void setAutoCommitBeforeRelease(Connection con, boolean autoCommitOnBorrow) throws SQLException {
+    switch (getBeforeReleaseAutoCommitStrategy()) {
+    case RESTORE:
+      setAutoCommit(con, autoCommitOnBorrow);
+      break;
+    case TRUE:
+      setAutoCommit(con, true);
+      break;
+    case FALSE:
+      setAutoCommit(con, false);
+      break;
+    default:
+    }
+  }
+
+  private static class TransactionalConnectionImpl extends ConnectionWrapper {
+    private boolean autoCommitOnBorrow;
+    private DataSourceImpl dataSourceImpl;
+
+    public TransactionalConnectionImpl(DataSourceImpl dataSourceImpl, Connection con) throws SQLException {
       super(con);
+      this.dataSourceImpl = dataSourceImpl;
+      autoCommitOnBorrow = con.getAutoCommit();
+      dataSourceImpl.setAutoCommit(con, false);
     }
 
     public void closeConnection() throws SQLException {
-      getConnection().close();
+      Connection con = getConnection();
+      dataSourceImpl.setAutoCommitBeforeRelease(con, autoCommitOnBorrow);
+      con.close();
     }
 
     @Override
@@ -127,10 +159,27 @@ public class DataSourceImpl extends DataSourceWrapper implements DataSourceMXBea
     }
   }
 
-  public static class XAResourceImpl extends DummyXAResource {
-    private final ConnectionImpl con;
+  private static class NonTransactionalConnectionImpl extends ConnectionWrapper {
+    private boolean autoCommitOnBorrow;
+    private DataSourceImpl dataSourceImpl;
 
-    public XAResourceImpl(ConnectionImpl con) {
+    public NonTransactionalConnectionImpl(DataSourceImpl dataSourceImpl, Connection con) throws SQLException {
+      super(con);
+      this.dataSourceImpl = dataSourceImpl;
+      autoCommitOnBorrow = con.getAutoCommit();
+      dataSourceImpl.setAutoCommit(con, true);
+    }
+
+    public void close() throws SQLException {
+      dataSourceImpl.setAutoCommitBeforeRelease(getConnection(), autoCommitOnBorrow);
+      super.close();
+    }
+  }
+
+  private static class XAResourceImpl extends DummyXAResource {
+    private final TransactionalConnectionImpl con;
+
+    public XAResourceImpl(TransactionalConnectionImpl con) {
       this.con = con;
     }
 
