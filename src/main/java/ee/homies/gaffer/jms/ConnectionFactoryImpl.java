@@ -77,10 +77,6 @@ public class ConnectionFactoryImpl implements ConnectionFactory, ConnectionFacto
     }
 
     @Override
-    public void close() throws JMSException {
-    }
-
-    @Override
     public Session createSession(boolean transacted, int acknowledgeMode) throws JMSException {
       TransactionSynchronizationRegistry registry = ServiceRegistryHolder.getServiceRegistry().getTransactionSynchronizationRegistry();
       allSessionGetsCount.incrementAndGet();
