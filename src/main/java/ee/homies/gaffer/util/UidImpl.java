@@ -1,5 +1,7 @@
 package ee.homies.gaffer.util;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -45,7 +47,7 @@ public class UidImpl implements Uid {
   }
 
   @Override
-  @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "EI_EXPOSE_REP", justification = "Performance is important.")
+  @SuppressFBWarnings(value = "EI_EXPOSE_REP", justification = "Performance is important.")
   public byte[] asBytes() {
     return bytes;
   }

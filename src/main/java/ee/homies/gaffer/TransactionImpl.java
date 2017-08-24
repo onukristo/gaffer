@@ -1,5 +1,6 @@
 package ee.homies.gaffer;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -102,7 +103,8 @@ public class TransactionImpl implements Transaction {
 
       Exception ex = null;
       int idx = 0;
-      for (XAResource xaResource : xaResources) {
+
+      for (XAResource xaResource : getSortedXaResource(xaResources)) {
         try {
           xaResource.commit(null, true);
         } catch (Exception e) {
@@ -205,7 +207,8 @@ public class TransactionImpl implements Transaction {
         log.debug("Rolling back transaction '%s'.", getTransactionInfo());
       }
       setStatus(Status.STATUS_ROLLING_BACK);
-      for (XAResource xaResource : xaResources) {
+
+      for (XAResource xaResource : getSortedXaResource(xaResources)) {
         try {
           xaResource.rollback(null);
         } catch (XAException e) {
@@ -301,6 +304,16 @@ public class TransactionImpl implements Transaction {
         log.error(e.getMessage(), e);
       }
     }
+  }
+
+  private List<XAResource> getSortedXaResource(List<XAResource> xaResources){
+    List<XAResource> result = new ArrayList<>(xaResources);
+    result.sort((a, b) -> {
+      int oa = a instanceof OrderedResource ? ((OrderedResource)a).getOrder() : Integer.MAX_VALUE;
+      int ob = a instanceof OrderedResource ? ((OrderedResource)b).getOrder() : Integer.MAX_VALUE;
+      return oa > ob ? 1 : oa == ob ? 0 : -1;
+    });
+    return result;
   }
 
   public String getTransactionInfo() {

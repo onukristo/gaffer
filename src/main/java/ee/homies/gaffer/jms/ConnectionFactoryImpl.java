@@ -1,6 +1,12 @@
 package ee.homies.gaffer.jms;
 
-import java.util.concurrent.atomic.AtomicLong;
+import ee.homies.gaffer.OrderedResource;
+import ee.homies.gaffer.ServiceRegistryHolder;
+import ee.homies.gaffer.util.DummyXAResource;
+import ee.homies.gaffer.util.FormatLogger;
+import ee.homies.gaffer.util.MBeanUtil;
+import ee.homies.gaffer.util.XAExceptionImpl;
+import org.apache.commons.lang3.StringUtils;
 
 import javax.annotation.PostConstruct;
 import javax.jms.Connection;
@@ -12,179 +18,207 @@ import javax.transaction.TransactionSynchronizationRegistry;
 import javax.transaction.xa.XAException;
 import javax.transaction.xa.XAResource;
 import javax.transaction.xa.Xid;
-
-import org.apache.commons.lang3.StringUtils;
-
-import ee.homies.gaffer.ServiceRegistryHolder;
-import ee.homies.gaffer.util.DummyXAResource;
-import ee.homies.gaffer.util.FormatLogger;
-import ee.homies.gaffer.util.MBeanUtil;
-import ee.homies.gaffer.util.XAExceptionImpl;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class ConnectionFactoryImpl implements ConnectionFactory, ConnectionFactoryMXBean {
-  private final static FormatLogger log = new FormatLogger(ConnectionFactoryImpl.class);
+	private final static FormatLogger log = new FormatLogger(ConnectionFactoryImpl.class);
 
-  private ConnectionFactory connectionFactory;
-  private static AtomicLong idSequence = new AtomicLong();
-  private String id;
-  private String sessionResourceKey;
-  private String uniqueName;
+	private ConnectionFactory connectionFactory;
+	private static AtomicLong idSequence = new AtomicLong();
+	private String id;
+	private String sessionResourceKey;
+	private String uniqueName;
+	private boolean registerAsMBean = true;
+	private int commitOrder = 0;
 
-  private final AtomicLong allSessionGetsCount = new AtomicLong();
-  private final AtomicLong bufferedSessionGetsCount = new AtomicLong();
-  private final AtomicLong nonTransactionalSessionGetsCount = new AtomicLong();
+	private final AtomicLong allSessionGetsCount = new AtomicLong();
+	private final AtomicLong bufferedSessionGetsCount = new AtomicLong();
+	private final AtomicLong nonTransactionalSessionGetsCount = new AtomicLong();
 
-  @PostConstruct
-  public void init() {
-    if (StringUtils.isEmpty(uniqueName)) {
-      throw new IllegalStateException("Unique name is not set.");
-    }
-    id = ConnectionFactoryImpl.class.getName() + "." + String.valueOf(idSequence.incrementAndGet());
-    sessionResourceKey = id + ".ses";
+	@PostConstruct
+	public void init() {
+		if (StringUtils.isEmpty(uniqueName)) {
+			throw new IllegalStateException("Unique name is not set.");
+		}
+		id = ConnectionFactoryImpl.class.getName() + "." + String.valueOf(idSequence.incrementAndGet());
+		sessionResourceKey = id + ".ses";
 
-    MBeanUtil.registerMBeanQuietly(this, "ee.homies.gaffer:type=JmsConnectionFactory,name=" + uniqueName);
-  }
+		if (registerAsMBean) {
+			MBeanUtil.registerMBeanQuietly(this, "ee.homies.gaffer:type=JmsConnectionFactory,name=" + uniqueName);
+		}
+	}
 
-  public String getUniqueName() {
-    return uniqueName;
-  }
+	public String getUniqueName() {
+		return uniqueName;
+	}
 
-  public void setUniqueName(String uniqueName) {
-    this.uniqueName = uniqueName;
-  }
+	public void setUniqueName(String uniqueName) {
+		this.uniqueName = uniqueName;
+	}
 
-  public ConnectionFactory getConnectionFactory() {
-    return connectionFactory;
-  }
+	public ConnectionFactory getConnectionFactory() {
+		return connectionFactory;
+	}
 
-  public void setConnectionFactory(ConnectionFactory connectionFactory) {
-    this.connectionFactory = connectionFactory;
-  }
+	public void setConnectionFactory(ConnectionFactory connectionFactory) {
+		this.connectionFactory = connectionFactory;
+	}
 
-  @Override
-  public Connection createConnection() throws JMSException {
-    return new ConnectionImpl(connectionFactory.createConnection());
-  }
+	public void setCommitOrder(int commitOrder){
+		this.commitOrder = commitOrder;
+	}
 
-  @Override
-  public Connection createConnection(String userName, String password) throws JMSException {
-    return new ConnectionImpl(connectionFactory.createConnection(userName, password));
-  }
+	public void setRegisterAsMBean(boolean registerAsMBean){
+		this.registerAsMBean = registerAsMBean;
+	}
 
-  private class ConnectionImpl extends ConnectionWrapper {
-    public ConnectionImpl(Connection connection) {
-      super(connection);
-    }
+	@Override
+	public Connection createConnection() throws JMSException {
+		return new ConnectionImpl(connectionFactory.createConnection(), uniqueName);
+	}
 
-    @Override
-    public Session createSession(boolean transacted, int acknowledgeMode) throws JMSException {
-      TransactionSynchronizationRegistry registry = ServiceRegistryHolder.getServiceRegistry().getTransactionSynchronizationRegistry();
-      allSessionGetsCount.incrementAndGet();
-      if (registry.getTransactionStatus() == Status.STATUS_NO_TRANSACTION) {
-        return createNonTransactionalSession(transacted, acknowledgeMode);
-      }
-      return createTransactionalSession(registry);
-    }
+	@Override
+	public Connection createConnection(String userName, String password) throws JMSException {
+		return new ConnectionImpl(connectionFactory.createConnection(userName, password), uniqueName);
+	}
 
-    private Session createTransactionalSession(TransactionSynchronizationRegistry registry) throws JMSException {
-      SessionImpl session = (SessionImpl) registry.getResource(sessionResourceKey);
-      if (session != null) {
-        bufferedSessionGetsCount.incrementAndGet();
-        return session;
-      }
-      Session jmsSession = getConnection().createSession(true, Session.SESSION_TRANSACTED);
-      session = new SessionImpl(jmsSession, null);
-      XAResourceImpl xaResource = new XAResourceImpl(session);
-      registry.putResource(sessionResourceKey, session);
+	private class ConnectionImpl extends ConnectionWrapper {
+		private AtomicInteger transactionalActiveSessionsCount = new AtomicInteger();
+		private String resourceUniqueName;
 
-      ServiceRegistryHolder.getServiceRegistry().getTransactionManager().getTransactionImpl().enlistResource(xaResource);
-      return session;
-    }
+		public ConnectionImpl(Connection connection, String resourceUniqueName) {
+			super(connection);
+			this.resourceUniqueName = resourceUniqueName;
+		}
 
-    private Session createNonTransactionalSession(boolean transacted, int acknowledgeMode) throws JMSException {
-      Session session = getConnection().createSession(transacted, acknowledgeMode);
-      nonTransactionalSessionGetsCount.incrementAndGet();
-      return session;
-    }
-  }
+		@Override
+		public Session createSession(boolean transacted, int acknowledgeMode) throws JMSException {
+			TransactionSynchronizationRegistry registry = ServiceRegistryHolder.getServiceRegistry().getTransactionSynchronizationRegistry();
+			allSessionGetsCount.incrementAndGet();
+			if (registry.getTransactionStatus() == Status.STATUS_NO_TRANSACTION) {
+				return createNonTransactionalSession(transacted, acknowledgeMode);
+			}
+			return createTransactionalSession(registry);
+		}
 
-  private static class SessionImpl extends XASessionWrapper {
-    public SessionImpl(Session session, XAResource xaResource) {
-      super(session, xaResource);
-    }
+		@Override
+		public void close() throws JMSException {
+			if (transactionalActiveSessionsCount.get() == 0) {
+				log.debug("Closing connection for resource '{}'.", resourceUniqueName);
+				getConnection().close();
+			}
+		}
 
-    @Override
-    public void commit() throws JMSException {
-      super.commit();
-    }
+		private void reduceTransactionalActiveSessionsCount(){
+			transactionalActiveSessionsCount.decrementAndGet();
+		}
 
-    @Override
-    public void close() throws JMSException {
-    }
+		private Session createTransactionalSession(TransactionSynchronizationRegistry registry) throws JMSException {
+			SessionImpl session = (SessionImpl) registry.getResource(sessionResourceKey);
+			if (session != null) {
+				bufferedSessionGetsCount.incrementAndGet();
+				return session;
+			}
+			Session jmsSession = getConnection().createSession(true, Session.SESSION_TRANSACTED);
+			transactionalActiveSessionsCount.incrementAndGet();
+			session = new SessionImpl(jmsSession, null, commitOrder);
+			XAResourceImpl xaResource = new XAResourceImpl(session);
+			registry.putResource(sessionResourceKey, session);
 
-    public void closeSession() throws JMSException {
-      getSession().close();
-    }
-  }
+			ServiceRegistryHolder.getServiceRegistry().getTransactionManager().getTransactionImpl().enlistResource(xaResource);
+			return session;
+		}
 
-  public static class XAResourceImpl extends DummyXAResource {
-    private final SessionImpl session;
+		private Session createNonTransactionalSession(boolean transacted, int acknowledgeMode) throws JMSException {
+			Session session = getConnection().createSession(transacted, acknowledgeMode);
+			nonTransactionalSessionGetsCount.incrementAndGet();
+			return session;
+		}
+	}
 
-    public XAResourceImpl(SessionImpl session) {
-      this.session = session;
-    }
+	private static class SessionImpl extends XASessionWrapper implements OrderedResource{
+		private int commitOrder;
 
-    @Override
-    public void commit(Xid xid, boolean onePhase) throws XAException {
-      try {
-        try {
-          session.commit();
-        } catch (JMSException e) {
-          throw new XAExceptionImpl(XAException.XAER_RMERR, e);
-        }
-      } finally {
-        try {
-          session.closeSession();
-        } catch (JMSException e) {
-          log.error(e.getMessage(), e);
-        }
-      }
-    }
+		public SessionImpl(Session session, XAResource xaResource, int commitOrder) {
+			super(session, xaResource);
+			this.commitOrder = commitOrder;
+		}
 
-    @Override
-    public void rollback(Xid xid) throws XAException {
-      try {
-        try {
-          session.rollback();
-        } catch (JMSException e) {
-          log.error(e.getMessage(), e);
-          throw new XAExceptionImpl(XAException.XAER_RMERR, e);
-        }
-      } finally {
-        try {
-          session.closeSession();
-        } catch (JMSException e) {
-          log.error(e.getMessage(), e);
-        }
-      }
-    }
-  }
+		@Override
+		public void commit() throws JMSException {
+			super.commit();
+		}
 
-  @Override
-  public long getAllSessionGetsCount() {
-    // TODO Auto-generated method stub
-    return 0;
-  }
+		@Override
+		public void close() throws JMSException {
+		}
 
-  @Override
-  public long getBufferedSessionGetsCount() {
-    // TODO Auto-generated method stub
-    return 0;
-  }
+		public void closeSession() throws JMSException {
+			getSession().close();
+		}
 
-  @Override
-  public long getNonTransactionalSessionGetsCount() {
-    // TODO Auto-generated method stub
-    return 0;
-  }
+		@Override
+		public int getOrder() {
+			return commitOrder;
+		}
+	}
+
+	public static class XAResourceImpl extends DummyXAResource {
+		private final SessionImpl session;
+
+		public XAResourceImpl(SessionImpl session) {
+			this.session = session;
+		}
+
+		@Override
+		public void commit(Xid xid, boolean onePhase) throws XAException {
+			try {
+				try {
+					session.commit();
+				} catch (JMSException e) {
+					throw new XAExceptionImpl(XAException.XAER_RMERR, e);
+				}
+			} finally {
+				try {
+					session.closeSession();
+				} catch (JMSException e) {
+					log.error(e.getMessage(), e);
+				}
+			}
+		}
+
+		@Override
+		public void rollback(Xid xid) throws XAException {
+			try {
+				try {
+					session.rollback();
+				} catch (JMSException e) {
+					log.error(e.getMessage(), e);
+					throw new XAExceptionImpl(XAException.XAER_RMERR, e);
+				}
+			} finally {
+				try {
+					session.closeSession();
+				} catch (JMSException e) {
+					log.error(e.getMessage(), e);
+				}
+			}
+		}
+	}
+
+	@Override
+	public long getAllSessionGetsCount() {
+		return allSessionGetsCount.get();
+	}
+
+	@Override
+	public long getBufferedSessionGetsCount() {
+		return bufferedSessionGetsCount.get();
+	}
+
+	@Override
+	public long getNonTransactionalSessionGetsCount() {
+		return nonTransactionalSessionGetsCount.get();
+	}
 }

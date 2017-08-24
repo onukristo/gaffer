@@ -4,9 +4,9 @@ import javax.management.MXBean;
 
 @MXBean
 public interface ConnectionFactoryMXBean {
-  public long getAllSessionGetsCount();
+  long getAllSessionGetsCount();
 
-  public long getBufferedSessionGetsCount();
+  long getBufferedSessionGetsCount();
 
-  public long getNonTransactionalSessionGetsCount();
+  long getNonTransactionalSessionGetsCount();
 }

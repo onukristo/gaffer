@@ -7,6 +7,7 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.transaction.UnexpectedRollbackException;
@@ -17,6 +18,7 @@ import ee.homies.gaffer.util.FormatLogger;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/ee/homies/gaffer/test/suspended/applicationContext.xml" })
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public class SuspendedTest {
   private static final FormatLogger log = new FormatLogger(SuspendedTest.class);
   @Resource(name = "clientsService")

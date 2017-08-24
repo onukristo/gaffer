@@ -249,7 +249,7 @@ public class ComplexTest {
     return (ClientsService) appCtxt.getBean("clientsService");
   }
 
-  protected class Stat {
+  protected static class Stat {
     private final long start = System.currentTimeMillis();
     private final String action;
 

@@ -11,6 +11,7 @@ import javax.transaction.xa.XAException;
 import javax.transaction.xa.XAResource;
 import javax.transaction.xa.Xid;
 
+import ee.homies.gaffer.OrderedResource;
 import org.apache.commons.lang3.StringUtils;
 
 import ee.homies.gaffer.ServiceRegistry;
@@ -27,7 +28,9 @@ public class DataSourceImpl extends DataSourceWrapper implements DataSourceMXBea
   private String id;
   private String connectionResourceKey;
   private String uniqueName;
+  private boolean registerAsMBean = true;
   private AutoCommitStrategy beforeReleaseAutoCommitStrategy = AutoCommitStrategy.NONE;
+  private int commitOrder = 0;
 
   private final AtomicLong allConnectionGetsCount = new AtomicLong();
   private final AtomicLong bufferedConnectionGetsCount = new AtomicLong();
@@ -42,7 +45,9 @@ public class DataSourceImpl extends DataSourceWrapper implements DataSourceMXBea
     id = DataSourceImpl.class + "." + String.valueOf(idSequence.incrementAndGet());
     connectionResourceKey = id + ".con";
 
-    MBeanUtil.registerMBeanQuietly(this, "ee.homies.gaffer:type=JdbcDataSource,name=" + uniqueName);
+    if (registerAsMBean) {
+      MBeanUtil.registerMBeanQuietly(this, "ee.homies.gaffer:type=JdbcDataSource,name=" + uniqueName);
+    }
   }
 
   public AutoCommitStrategy getBeforeReleaseAutoCommitStrategy() {
@@ -59,6 +64,14 @@ public class DataSourceImpl extends DataSourceWrapper implements DataSourceMXBea
 
   public void setUniqueName(String uniqueName) {
     this.uniqueName = uniqueName;
+  }
+
+  public void setCommitOrder(int commitOrder){
+    this.commitOrder = commitOrder;
+  }
+
+  public void setRegisterAsMBean(boolean registerAsMBean){
+    this.registerAsMBean = registerAsMBean;
   }
 
   @Override
@@ -92,9 +105,9 @@ public class DataSourceImpl extends DataSourceWrapper implements DataSourceMXBea
       throws SQLException {
     TransactionalConnectionImpl con = (TransactionalConnectionImpl) registry.getResource(connectionResourceKey);
     if (con == null) {
-      con = new TransactionalConnectionImpl(this, getConnectionFromDataSource(username, password));
+      con = new TransactionalConnectionImpl(this, getConnectionFromDataSource(username, password), uniqueName);
       registry.putResource(connectionResourceKey, con);
-      XAResource xaResource = new XAResourceImpl(con);
+      XAResource xaResource = new XAResourceImpl(con, commitOrder);
       serviceRegistry.getTransactionManager().getTransactionImpl().enlistResource(xaResource);
     } else {
       bufferedConnectionGetsCount.incrementAndGet();
@@ -140,10 +153,12 @@ public class DataSourceImpl extends DataSourceWrapper implements DataSourceMXBea
   private static class TransactionalConnectionImpl extends ConnectionWrapper {
     private boolean autoCommitOnBorrow;
     private DataSourceImpl dataSourceImpl;
+    private String resourceUniqueName;
 
-    public TransactionalConnectionImpl(DataSourceImpl dataSourceImpl, Connection con) throws SQLException {
+    public TransactionalConnectionImpl(DataSourceImpl dataSourceImpl, Connection con, String resourceUniqueName) throws SQLException {
       super(con);
       this.dataSourceImpl = dataSourceImpl;
+      this.resourceUniqueName = resourceUniqueName;
       autoCommitOnBorrow = con.getAutoCommit();
       dataSourceImpl.setAutoCommit(con, false);
     }
@@ -151,6 +166,7 @@ public class DataSourceImpl extends DataSourceWrapper implements DataSourceMXBea
     public void closeConnection() throws SQLException {
       Connection con = getConnection();
       dataSourceImpl.setAutoCommitBeforeRelease(con, autoCommitOnBorrow);
+      log.debug("Closing connection for resource '{}'.", resourceUniqueName);
       con.close();
     }
 
@@ -176,11 +192,13 @@ public class DataSourceImpl extends DataSourceWrapper implements DataSourceMXBea
     }
   }
 
-  private static class XAResourceImpl extends DummyXAResource {
+  private static class XAResourceImpl extends DummyXAResource implements OrderedResource{
     private final TransactionalConnectionImpl con;
+    private final int commitOrder;
 
-    public XAResourceImpl(TransactionalConnectionImpl con) {
+    public XAResourceImpl(TransactionalConnectionImpl con, int commitOrder) {
       this.con = con;
+      this.commitOrder = commitOrder;
     }
 
     @Override
@@ -215,6 +233,11 @@ public class DataSourceImpl extends DataSourceWrapper implements DataSourceMXBea
           log.error(e.getMessage(), e);
         }
       }
+    }
+
+    @Override
+    public int getOrder() {
+      return commitOrder;
     }
   }
 

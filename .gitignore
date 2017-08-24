@@ -1,1 +1,17 @@
-/target
+/logs
+/build
+/activemq-data
+/.gradle
+
+## Idea
+/.idea
+*.iml
+*.ipr
+*.iws
+
+## Gradle
+/caches
+/native
+/wrapper
+/run
+/daemon
