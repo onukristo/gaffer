@@ -30,7 +30,7 @@ public class ConnectionFactoryImpl implements ConnectionFactory, ConnectionFacto
 	private String sessionResourceKey;
 	private String uniqueName;
 	private boolean registerAsMBean = true;
-	private int commitOrder = 0;
+	private int order = 0;
 
 	private final AtomicLong allSessionGetsCount = new AtomicLong();
 	private final AtomicLong bufferedSessionGetsCount = new AtomicLong();
@@ -65,11 +65,11 @@ public class ConnectionFactoryImpl implements ConnectionFactory, ConnectionFacto
 		this.connectionFactory = connectionFactory;
 	}
 
-	public void setCommitOrder(int commitOrder){
-		this.commitOrder = commitOrder;
+	public void setOrder(int order) {
+		this.order = order;
 	}
 
-	public void setRegisterAsMBean(boolean registerAsMBean){
+	public void setRegisterAsMBean(boolean registerAsMBean) {
 		this.registerAsMBean = registerAsMBean;
 	}
 
@@ -110,7 +110,7 @@ public class ConnectionFactoryImpl implements ConnectionFactory, ConnectionFacto
 			}
 		}
 
-		private void reduceTransactionalActiveSessionsCount(){
+		private void reduceTransactionalActiveSessionsCount() {
 			transactionalActiveSessionsCount.decrementAndGet();
 		}
 
@@ -122,8 +122,8 @@ public class ConnectionFactoryImpl implements ConnectionFactory, ConnectionFacto
 			}
 			Session jmsSession = getConnection().createSession(true, Session.SESSION_TRANSACTED);
 			transactionalActiveSessionsCount.incrementAndGet();
-			session = new SessionImpl(jmsSession, null, commitOrder);
-			XAResourceImpl xaResource = new XAResourceImpl(session);
+			session = new SessionImpl(jmsSession, null);
+			XAResourceImpl xaResource = new XAResourceImpl(session, order);
 			registry.putResource(sessionResourceKey, session);
 
 			ServiceRegistryHolder.getServiceRegistry().getTransactionManager().getTransactionImpl().enlistResource(xaResource);
@@ -137,12 +137,9 @@ public class ConnectionFactoryImpl implements ConnectionFactory, ConnectionFacto
 		}
 	}
 
-	private static class SessionImpl extends XASessionWrapper implements OrderedResource{
-		private int commitOrder;
-
-		public SessionImpl(Session session, XAResource xaResource, int commitOrder) {
+	private static class SessionImpl extends XASessionWrapper {
+		public SessionImpl(Session session, XAResource xaResource) {
 			super(session, xaResource);
-			this.commitOrder = commitOrder;
 		}
 
 		@Override
@@ -157,18 +154,15 @@ public class ConnectionFactoryImpl implements ConnectionFactory, ConnectionFacto
 		public void closeSession() throws JMSException {
 			getSession().close();
 		}
-
-		@Override
-		public int getOrder() {
-			return commitOrder;
-		}
 	}
 
-	public static class XAResourceImpl extends DummyXAResource {
+	public static class XAResourceImpl extends DummyXAResource implements OrderedResource {
 		private final SessionImpl session;
+		private int order;
 
-		public XAResourceImpl(SessionImpl session) {
+		public XAResourceImpl(SessionImpl session, int order) {
 			this.session = session;
+			this.order = order;
 		}
 
 		@Override
@@ -204,6 +198,11 @@ public class ConnectionFactoryImpl implements ConnectionFactory, ConnectionFacto
 					log.error(e.getMessage(), e);
 				}
 			}
+		}
+
+		@Override
+		public int getOrder() {
+			return order;
 		}
 	}
 

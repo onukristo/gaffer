@@ -30,7 +30,7 @@ public class DataSourceImpl extends DataSourceWrapper implements DataSourceMXBea
   private String uniqueName;
   private boolean registerAsMBean = true;
   private AutoCommitStrategy beforeReleaseAutoCommitStrategy = AutoCommitStrategy.NONE;
-  private int commitOrder = 0;
+  private int order = 0;
 
   private final AtomicLong allConnectionGetsCount = new AtomicLong();
   private final AtomicLong bufferedConnectionGetsCount = new AtomicLong();
@@ -66,8 +66,8 @@ public class DataSourceImpl extends DataSourceWrapper implements DataSourceMXBea
     this.uniqueName = uniqueName;
   }
 
-  public void setCommitOrder(int commitOrder){
-    this.commitOrder = commitOrder;
+  public void setOrder(int order){
+    this.order = order;
   }
 
   public void setRegisterAsMBean(boolean registerAsMBean){
@@ -107,7 +107,7 @@ public class DataSourceImpl extends DataSourceWrapper implements DataSourceMXBea
     if (con == null) {
       con = new TransactionalConnectionImpl(this, getConnectionFromDataSource(username, password), uniqueName);
       registry.putResource(connectionResourceKey, con);
-      XAResource xaResource = new XAResourceImpl(con, commitOrder);
+      XAResource xaResource = new XAResourceImpl(con, order);
       serviceRegistry.getTransactionManager().getTransactionImpl().enlistResource(xaResource);
     } else {
       bufferedConnectionGetsCount.incrementAndGet();
@@ -194,11 +194,11 @@ public class DataSourceImpl extends DataSourceWrapper implements DataSourceMXBea
 
   private static class XAResourceImpl extends DummyXAResource implements OrderedResource{
     private final TransactionalConnectionImpl con;
-    private final int commitOrder;
+    private final int order;
 
-    public XAResourceImpl(TransactionalConnectionImpl con, int commitOrder) {
+    public XAResourceImpl(TransactionalConnectionImpl con, int order) {
       this.con = con;
-      this.commitOrder = commitOrder;
+      this.order = order;
     }
 
     @Override
@@ -237,7 +237,7 @@ public class DataSourceImpl extends DataSourceWrapper implements DataSourceMXBea
 
     @Override
     public int getOrder() {
-      return commitOrder;
+      return order;
     }
   }
 
