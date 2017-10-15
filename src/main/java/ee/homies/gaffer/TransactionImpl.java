@@ -113,7 +113,7 @@ public class TransactionImpl implements Transaction {
       }
       catch (Throwable t){
         rollback();
-        exceptionThrower.throwException(new RollbackExceptionImpl("Can not commit '" + getTransactionInfo() + "'. Invalid xaResource found: " + xaResource.toString() ));
+        exceptionThrower.throwException(new RollbackExceptionImpl("Can not commit '" + getTransactionInfo() + "'." + (xaResource == null ? "" : " Invalid xaResource found: " + xaResource.toString())));
       }
     }
 
