@@ -8,6 +8,7 @@ public class Configuration {
    * rollbacks and commits, so logging those out in gaffer can be neccessary.
    */
   private boolean logExceptions = false;
+  private long beforeCommitValidationRequiredTimeMs = -1;
 
   public String getInstanceId() {
     return instanceId;
@@ -23,6 +24,14 @@ public class Configuration {
 
   public void setLogExceptions(boolean logExceptions) {
     this.logExceptions = logExceptions;
+  }
+
+  public long getBeforeCommitValidationRequiredTimeMs(){
+    return beforeCommitValidationRequiredTimeMs;
+  }
+
+  public void setbeforeCommitValidationRequiredTimeMs(long beforeCommitValidationRequiredTimeMs){
+    this.beforeCommitValidationRequiredTimeMs = beforeCommitValidationRequiredTimeMs;
   }
 
 }

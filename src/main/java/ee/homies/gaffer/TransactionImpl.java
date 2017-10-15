@@ -26,6 +26,7 @@ public class TransactionImpl implements Transaction {
   private final Map<Object, Object> resources = new ConcurrentHashMap<>();
   private final Clock clock;
   private final long startTimeMillis;
+  private long beforeCommitValidationRequiredTimeMs = -1;
   private long timeoutMillis = -1;
   private boolean notAbandoned;
   private boolean suspended;
@@ -58,13 +59,14 @@ public class TransactionImpl implements Transaction {
     return resources.get(key);
   }
 
-  public void begin(Integer timeoutSeconds) {
+  public void begin(Integer timeoutSeconds, long beforeCommitValidationRequiredTimeMs) {
     if (log.isDebugEnabled()) {
       log.debug("Starting transaction '%s' with timeout of '%s' seconds.", getTransactionInfo(), timeoutSeconds == null ? "infinite" : timeoutSeconds);
     }
     if (timeoutSeconds != null) {
       setTimeoutMillis(timeoutSeconds * 1000);
     }
+    this.beforeCommitValidationRequiredTimeMs = beforeCommitValidationRequiredTimeMs;
     status = Status.STATUS_ACTIVE;
   }
 
@@ -92,10 +94,27 @@ public class TransactionImpl implements Transaction {
       rollback();
       exceptionThrower.throwException(new RollbackExceptionImpl("Can not commit '" + getTransactionInfo() + "'. Transaction was marked as to be rolled back."));
     }
-
-    if (isTimedOut()) {
+    else if (isTimedOut()) {
       rollback();
       exceptionThrower.throwException(new RollbackExceptionImpl("Can not commit '" + getTransactionInfo() + "'. Transaction has timed out."));
+    }
+
+    if (beforeCommitValidationRequired()){
+      XAResource xaResource = null;
+      try {
+        for (XAResource tmpXaResource : getSortedXaResource(xaResources)) {
+          xaResource = tmpXaResource;
+          if (xaResource instanceof ValidatableResource){
+            if (!((ValidatableResource)xaResource).isValid()){
+              throw new IllegalStateException("Resource " + xaResource + " is not valid anymore.");
+            }
+          }
+        }
+      }
+      catch (Throwable t){
+        rollback();
+        exceptionThrower.throwException(new RollbackExceptionImpl("Can not commit '" + getTransactionInfo() + "'. Invalid xaResource found: " + xaResource.toString() ));
+      }
     }
 
     try {
@@ -270,6 +289,13 @@ public class TransactionImpl implements Transaction {
 
   public void setTimeoutMillis(long timeoutMillis) {
     this.timeoutMillis = timeoutMillis;
+  }
+
+  public boolean beforeCommitValidationRequired(){
+    if (beforeCommitValidationRequiredTimeMs < 0){
+      return false;
+    }
+    return clock.currentTimeMillis() - getStartTimeMillis() > beforeCommitValidationRequiredTimeMs;
   }
 
   public boolean isTimedOut() {

@@ -12,6 +12,7 @@ import javax.transaction.xa.XAResource;
 import javax.transaction.xa.Xid;
 
 import ee.homies.gaffer.OrderedResource;
+import ee.homies.gaffer.ValidatableResource;
 import org.apache.commons.lang3.StringUtils;
 
 import ee.homies.gaffer.ServiceRegistry;
@@ -29,6 +30,8 @@ public class DataSourceImpl extends DataSourceWrapper implements DataSourceMXBea
   private String connectionResourceKey;
   private String uniqueName;
   private boolean registerAsMBean = true;
+
+  private int validationTimeoutSeconds = 0;
   private AutoCommitStrategy beforeReleaseAutoCommitStrategy = AutoCommitStrategy.NONE;
   private int order = 0;
 
@@ -74,6 +77,14 @@ public class DataSourceImpl extends DataSourceWrapper implements DataSourceMXBea
     this.registerAsMBean = registerAsMBean;
   }
 
+  public int getValidationTimeoutSeconds() {
+    return validationTimeoutSeconds;
+  }
+
+  public void setValidationTimeoutSeconds(int validationTimeoutSeconds) {
+    this.validationTimeoutSeconds = validationTimeoutSeconds;
+  }
+
   @Override
   public Connection getConnection() throws SQLException {
     return getConnection0(null, null);
@@ -107,7 +118,7 @@ public class DataSourceImpl extends DataSourceWrapper implements DataSourceMXBea
     if (con == null) {
       con = new TransactionalConnectionImpl(this, getConnectionFromDataSource(username, password), uniqueName);
       registry.putResource(connectionResourceKey, con);
-      XAResource xaResource = new XAResourceImpl(con, order);
+      XAResource xaResource = new XAResourceImpl(con, order, getValidationTimeoutSeconds());
       serviceRegistry.getTransactionManager().getTransactionImpl().enlistResource(xaResource);
     } else {
       bufferedConnectionGetsCount.incrementAndGet();
@@ -192,13 +203,15 @@ public class DataSourceImpl extends DataSourceWrapper implements DataSourceMXBea
     }
   }
 
-  private static class XAResourceImpl extends DummyXAResource implements OrderedResource{
+  private static class XAResourceImpl extends DummyXAResource implements OrderedResource, ValidatableResource {
     private final TransactionalConnectionImpl con;
     private final int order;
+    private final int validationTimeoutSeconds;
 
-    public XAResourceImpl(TransactionalConnectionImpl con, int order) {
+    public XAResourceImpl(TransactionalConnectionImpl con, int order, int validationTimeoutSeconds) {
       this.con = con;
       this.order = order;
+      this.validationTimeoutSeconds = validationTimeoutSeconds;
     }
 
     @Override
@@ -238,6 +251,16 @@ public class DataSourceImpl extends DataSourceWrapper implements DataSourceMXBea
     @Override
     public int getOrder() {
       return order;
+    }
+
+    @Override
+    public boolean isValid() {
+      try {
+        return con.isValid(validationTimeoutSeconds);
+      }
+      catch (SQLException e){
+        throw new RuntimeException(e);
+      }
     }
   }
 

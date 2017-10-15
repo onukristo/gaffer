@@ -14,9 +14,12 @@ public class TransactionManagerImpl implements TransactionManager {
   private final TransactionManagerStatistics statistics;
   private final ExceptionThrower exceptionThrower;
 
+  private final Configuration configuration;
+
   public TransactionManagerImpl(TransactionManagerStatistics statistics, Configuration configuration) {
     this.statistics = statistics;
     exceptionThrower = new ExceptionThrower(configuration.isLogExceptions());
+    this.configuration = configuration;
   }
 
   @Override
@@ -27,7 +30,7 @@ public class TransactionManagerImpl implements TransactionManager {
     }
 
     TransactionImpl transactionImpl = new TransactionImpl();
-    transactionImpl.begin(transactionTimeoutsSeconds.get());
+    transactionImpl.begin(transactionTimeoutsSeconds.get(), configuration.getBeforeCommitValidationRequiredTimeMs());
     transactions.set(transactionImpl);
 
     statistics.markBegin();

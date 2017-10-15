@@ -123,7 +123,7 @@ public class ConnectionFactoryImpl implements ConnectionFactory, ConnectionFacto
 			Session jmsSession = getConnection().createSession(true, Session.SESSION_TRANSACTED);
 			transactionalActiveSessionsCount.incrementAndGet();
 			session = new SessionImpl(jmsSession, null);
-			XAResourceImpl xaResource = new XAResourceImpl(session, order);
+			XAResourceImpl xaResource = new XAResourceImpl(session, order, uniqueName);
 			registry.putResource(sessionResourceKey, session);
 
 			ServiceRegistryHolder.getServiceRegistry().getTransactionManager().getTransactionImpl().enlistResource(xaResource);
@@ -159,10 +159,12 @@ public class ConnectionFactoryImpl implements ConnectionFactory, ConnectionFacto
 	public static class XAResourceImpl extends DummyXAResource implements OrderedResource {
 		private final SessionImpl session;
 		private int order;
+		private String uniqueName;
 
-		public XAResourceImpl(SessionImpl session, int order) {
+		public XAResourceImpl(SessionImpl session, int order, String uniqueName) {
 			this.session = session;
 			this.order = order;
+			this.uniqueName = uniqueName;
 		}
 
 		@Override
@@ -203,6 +205,11 @@ public class ConnectionFactoryImpl implements ConnectionFactory, ConnectionFacto
 		@Override
 		public int getOrder() {
 			return order;
+		}
+
+		@Override
+		public String toString(){
+			return "DB " + uniqueName;
 		}
 	}
 
