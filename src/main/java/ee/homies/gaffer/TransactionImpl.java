@@ -85,9 +85,9 @@ public class TransactionImpl implements Transaction {
 
     try {
       fireBeforeCompletionEvent();
-    } catch (RuntimeException e) {
+    } catch (Throwable t) {
       rollback();
-      exceptionThrower.throwException(new RollbackExceptionImpl("Can not commit '" + getTransactionInfo() + "'. Before completion event firing failed.", e));
+      exceptionThrower.throwException(new RollbackExceptionImpl("Can not commit '" + getTransactionInfo() + "'. Before completion event firing failed.", t));
     }
 
     if (status == Status.STATUS_MARKED_ROLLBACK) {
@@ -120,28 +120,28 @@ public class TransactionImpl implements Transaction {
     try {
       setStatus(Status.STATUS_COMMITTING);
 
-      Exception ex = null;
+      Throwable t = null;
       int idx = 0;
 
       for (XAResource xaResource : getSortedXaResource(xaResources)) {
         try {
           xaResource.commit(null, true);
-        } catch (Exception e) {
-          ex = e;
+        } catch (Throwable t0) {
+          t = t0;
           break;
         }
         idx++;
       }
 
-      if (ex != null) {
+      if (t != null) {
         if (idx > 0) {
           getTransactionManagerStatistics().markHeuristicCommit();
         }
         rollback();
         if (idx == 0) {
-          exceptionThrower.throwException(new RollbackExceptionImpl("Can not commit '" + getTransactionInfo() + "'. Commiting a resource failed.", ex));
+          exceptionThrower.throwException(new RollbackExceptionImpl("Can not commit '" + getTransactionInfo() + "'. Commiting a resource failed.", t));
         }
-        exceptionThrower.throwException(new HeuristicMixedExceptionImpl("Can not commit '" + getTransactionInfo() + "'. Commiting a resource failed.", ex));
+        exceptionThrower.throwException(new HeuristicMixedExceptionImpl("Can not commit '" + getTransactionInfo() + "'. Commiting a resource failed.", t));
       }
       setStatus(Status.STATUS_COMMITTED);
       notAbandoned = true;
@@ -238,9 +238,14 @@ public class TransactionImpl implements Transaction {
       resources.clear();
       setStatus(Status.STATUS_ROLLEDBACK);
       getTransactionManagerStatistics().markRollback(suspended);
-    } catch (RuntimeException e) {
+    } catch (Throwable t) {
       getTransactionManagerStatistics().markRollbackFailure(suspended);
-      exceptionThrower.throwException(e);
+      if (t instanceof RuntimeException) {
+        exceptionThrower.throwException((RuntimeException) t);
+      }
+      else{
+        exceptionThrower.throwException(new RuntimeException(t));
+      }
     }
   }
 
@@ -319,15 +324,15 @@ public class TransactionImpl implements Transaction {
     for (Synchronization synchronization : interposedSynchronizations) {
       try {
         synchronization.afterCompletion(getStatus());
-      } catch (RuntimeException e) {
-        log.error(e.getMessage(), e);
+      } catch (Throwable t) {
+        log.error(t.getMessage(), t);
       }
     }
     for (Synchronization synchronization : synchronizations) {
       try {
         synchronization.afterCompletion(getStatus());
-      } catch (RuntimeException e) {
-        log.error(e.getMessage(), e);
+      } catch (Throwable t) {
+        log.error(t.getMessage(), t);
       }
     }
   }

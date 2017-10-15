@@ -9,7 +9,7 @@ public class HeuristicMixedExceptionImpl extends RollbackException {
     super(message);
   }
 
-  public HeuristicMixedExceptionImpl(String message, Exception cause) {
+  public HeuristicMixedExceptionImpl(String message, Throwable cause) {
     super(message);
     initCause(cause);
   }

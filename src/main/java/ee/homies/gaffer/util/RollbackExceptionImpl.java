@@ -9,7 +9,7 @@ public class RollbackExceptionImpl extends RollbackException {
     super(message);
   }
 
-  public RollbackExceptionImpl(String message, Exception cause) {
+  public RollbackExceptionImpl(String message, Throwable cause) {
     super(message);
     initCause(cause);
   }
