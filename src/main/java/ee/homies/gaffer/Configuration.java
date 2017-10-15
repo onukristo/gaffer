@@ -30,7 +30,7 @@ public class Configuration {
     return beforeCommitValidationRequiredTimeMs;
   }
 
-  public void setbeforeCommitValidationRequiredTimeMs(long beforeCommitValidationRequiredTimeMs){
+  public void setBeforeCommitValidationRequiredTimeMs(long beforeCommitValidationRequiredTimeMs){
     this.beforeCommitValidationRequiredTimeMs = beforeCommitValidationRequiredTimeMs;
   }
 
